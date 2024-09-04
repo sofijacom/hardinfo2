@@ -54,6 +54,8 @@ typedef struct {
     char *machine_type;
     char *linux_kernel;       /*kernelarch*/
     char *linux_os;           /*distroversion*/
+    char *power_state;
+    char *gpu_name;
 } bench_machine;
 
 typedef struct {
@@ -190,6 +192,8 @@ bench_machine *bench_machine_this()
         m->machine_type = module_call_method("computer::getMachineType");
 	m->linux_kernel = module_call_method("computer::getOSKernel");
 	m->linux_os = module_call_method("computer::getOS");
+	m->power_state= module_call_method("devices::getPowerState");
+	m->gpu_name= module_call_method("devices::getGPUname");
         free(tmp);
 
         cpu_procs_cores_threads_nodes(&m->processors, &m->cores, &m->threads, &m->nodes);
@@ -256,34 +260,6 @@ static int nx_prefix(const char *str)
         }
     }
     return -1;
-}
-
-/* old results didn't store the actual number of threads used */
-static int guess_threads_old_result(const char *bench_name,
-                                    int threads_available)
-{
-#define CHKBNAME(BN) (strcmp(bench_name, BN) == 0)
-    if (CHKBNAME("CPU Fibonacci"))
-        return 1;
-    if (CHKBNAME("FPU FFT")) {
-        if (threads_available >= 4)
-            return 4;
-        else if (threads_available >= 2)
-            return 2;
-        else
-            return 1;
-    }
-    if (CHKBNAME("CPU N-Queens")) {
-        if (threads_available >= 10)
-            return 10;
-        else if (threads_available >= 5)
-            return 5;
-        else if (threads_available >= 2)
-            return 2;
-        else
-            return 1;
-    }
-    return threads_available;
 }
 
 static gboolean cpu_name_needs_cleanup(const char *cpu_name)
@@ -464,6 +440,8 @@ bench_result *bench_result_benchmarkjson(const gchar *bench_name,
         .ram_types = json_get_string_dup(machine, "MemoryTypes"),
         .machine_data_version = json_get_int(machine, "MachineDataVersion"),
         .machine_type = json_get_string_dup(machine, "MachineType"),
+	.gpu_name= json_get_string_dup(machine, "GPU"),
+
     };
 
     return b;
@@ -525,7 +503,7 @@ static char *bench_result_more_info_less(bench_result *b)
         _("CPU Description"), (b->machine->cpu_desc != NULL) ? b->machine->cpu_desc : _(unk),
         _("CPU Config"), b->machine->cpu_config,
         _("Threads Available"), b->machine->threads,
-        _("GPU"), (b->machine->gpu_desc != NULL) ? b->machine->gpu_desc : _(unk),
+        _("GPU"), (b->machine->gpu_name != NULL) ? b->machine->gpu_name : (b->machine->gpu_desc != NULL) ? b->machine->gpu_desc : _(unk),
         _("OpenGL Renderer"), (b->machine->ogl_renderer != NULL) ? b->machine->ogl_renderer : _(unk),
         _("Memory"), memory,
         b->machine->ptr_bits ? _("Pointer Size") : "#AddySize", bits);
@@ -591,7 +569,7 @@ static char *bench_result_more_info_complete(bench_result *b)
         (b->machine->cpu_desc != NULL) ? b->machine->cpu_desc : _(unk),
         _("CPU Config"), b->machine->cpu_config, _("Threads Available"),
         b->machine->threads, _("GPU"),
-        (b->machine->gpu_desc != NULL) ? b->machine->gpu_desc : _(unk),
+        (b->machine->gpu_name != NULL) ? b->machine->gpu_name : (b->machine->gpu_desc != NULL) ? b->machine->gpu_desc : _(unk),
         _("OpenGL Renderer"),
         (b->machine->ogl_renderer != NULL) ? b->machine->ogl_renderer : _(unk),
         _("Memory"), b->machine->memory_kiB, _("kiB"), _("Physical Memory"),

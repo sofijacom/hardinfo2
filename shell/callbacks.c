@@ -20,6 +20,7 @@
 #include <gtk/gtk.h>
 #include <glib.h>
 #include <glib/gstdio.h>
+#include <fcntl.h>
 
 #include "hardinfo.h"
 #include "callbacks.h"
@@ -145,7 +146,7 @@ void cb_disable_theme()
 {
     Shell *shell = shell_get_main_shell();
     // *shelltree=shell->tree;
-    char theme_st[200];
+    char theme_st[400];
     GKeyFile *key_file = g_key_file_new();
 #if GTK_CHECK_VERSION(3, 0, 0)
     GtkCssProvider *provider;
@@ -185,21 +186,33 @@ void cb_disable_theme()
 #if GTK_CHECK_VERSION(3, 0, 0)
     if(params.theme>0){//enable
        if(params.darkmode){
-	   sprintf(theme_st,"window.background {background-image: url(\"/usr/share/hardinfo2/pixmaps/bg%d_dark.jpg\"); background-repeat: no-repeat; background-size:100%% 100%%; }",params.theme);
+	   sprintf(theme_st,"window.background {background-image: url(\"%s/pixmaps/bg%d_dark.jpg\"); background-repeat: no-repeat; background-size:100%% 100%%; }",params.path_data,params.theme);
        }else{
-           sprintf(theme_st,"window.background {background-image: url(\"/usr/share/hardinfo2/pixmaps/bg%d_light.jpg\"); background-repeat: no-repeat; background-size:100%% 100%%; }",params.theme);
+	   sprintf(theme_st,"window.background {background-image: url(\"%s/pixmaps/bg%d_light.jpg\"); background-repeat: no-repeat; background-size:100%% 100%%; }",params.path_data,params.theme);
        }
        gtk_css_provider_load_from_data(provider, theme_st, -1, NULL);
        if(shell->window) gtk_style_context_add_provider(gtk_widget_get_style_context(shell->window), GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-       //menubar
-       gtk_css_provider_load_from_data(provider2, "* { background-color: rgba(0x60, 0x60, 0x60, 0.1); } * text { background-color: rgba(1, 1, 1, 1); }", -1, NULL);
-       if(shell->ui_manager) gtk_style_context_add_provider(gtk_widget_get_style_context(gtk_ui_manager_get_widget(shell->ui_manager,"/MainMenuBarAction")), GTK_STYLE_PROVIDER(provider2), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-       //treeviewinfo
-       gtk_css_provider_load_from_data(provider3, "treeview { background-color: rgba(0x60, 0x60, 0x60, 0.1); } treeview:selected { background-color: rgba(0x40, 0x60, 0xff, 1); } ", -1, NULL);
-       if(shell->info_tree && shell->info_tree->view) gtk_style_context_add_provider(gtk_widget_get_style_context(shell->info_tree->view), GTK_STYLE_PROVIDER(provider3), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-       //treeviewmain
-       gtk_css_provider_load_from_data(provider3, "treeview { background-color: rgba(0x60, 0x60, 0x60, 0.1); } treeview:selected { background-color: rgba(0x40, 0x60, 0xff, 1); } ", -1, NULL);
-       if(shell->tree && shell->tree->view) gtk_style_context_add_provider(gtk_widget_get_style_context(shell->tree->view), GTK_STYLE_PROVIDER(provider3), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+       if(params.darkmode){
+           //menubar
+           gtk_css_provider_load_from_data(provider2, "* { background-color: rgba(0xa0, 0xa0, 0xa0, 0.1); } * text { background-color: rgba(1, 1, 1, 1); }", -1, NULL);
+           if(shell->ui_manager) gtk_style_context_add_provider(gtk_widget_get_style_context(gtk_ui_manager_get_widget(shell->ui_manager,"/MainMenuBarAction")), GTK_STYLE_PROVIDER(provider2), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+           //treeviewinfo
+           gtk_css_provider_load_from_data(provider3, "treeview { background-color: rgba(0xa0, 0xa0, 0xa0, 0.1); } treeview:selected { background-color: rgba(0x60, 0x80, 0xff, 1); } ", -1, NULL);
+           if(shell->info_tree && shell->info_tree->view) gtk_style_context_add_provider(gtk_widget_get_style_context(shell->info_tree->view), GTK_STYLE_PROVIDER(provider3), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+           //treeviewmain
+           gtk_css_provider_load_from_data(provider3, "treeview { background-color: rgba(0xa0, 0xa0, 0xa0, 0.1); } treeview:selected { background-color: rgba(0x60, 0x80, 0xff, 1); } ", -1, NULL);
+           if(shell->tree && shell->tree->view) gtk_style_context_add_provider(gtk_widget_get_style_context(shell->tree->view), GTK_STYLE_PROVIDER(provider3), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+       }else{
+           //menubar
+           gtk_css_provider_load_from_data(provider2, "* { background-color: rgba(0x60, 0x60, 0x60, 0.1); } * text { background-color: rgba(1, 1, 1, 1); }", -1, NULL);
+           if(shell->ui_manager) gtk_style_context_add_provider(gtk_widget_get_style_context(gtk_ui_manager_get_widget(shell->ui_manager,"/MainMenuBarAction")), GTK_STYLE_PROVIDER(provider2), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+           //treeviewinfo
+           gtk_css_provider_load_from_data(provider3, "treeview { background-color: rgba(0x60, 0x60, 0x60, 0.1); } treeview:selected { background-color: rgba(0x30, 0x50, 0xff, 1); } ", -1, NULL);
+           if(shell->info_tree && shell->info_tree->view) gtk_style_context_add_provider(gtk_widget_get_style_context(shell->info_tree->view), GTK_STYLE_PROVIDER(provider3), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+           //treeviewmain
+           gtk_css_provider_load_from_data(provider3, "treeview { background-color: rgba(0x60, 0x60, 0x60, 0.1); } treeview:selected { background-color: rgba(0x30, 0x50, 0xff, 1); } ", -1, NULL);
+           if(shell->tree && shell->tree->view) gtk_style_context_add_provider(gtk_widget_get_style_context(shell->tree->view), GTK_STYLE_PROVIDER(provider3), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+       }
     } else {//disable
        gtk_css_provider_load_from_data(provider, "window.background {background-image: none; }", -1, NULL);
        if(shell->window) gtk_style_context_add_provider(gtk_widget_get_style_context(shell->window), GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
@@ -299,9 +312,13 @@ void cb_toolbar()
 
 void cb_about()
 {
+    gchar *path;
+    unsigned int latest_ver=0,u1=0,u2=0,u3=0,a1=0,a2=0,a3=0,app_ver=0;
+    int fd=-1;
     Shell *shell = shell_get_main_shell();
     GtkWidget *about;
     gchar *copyright = NULL;
+    gchar *version;
     const gchar *authors[] = {
         "L. A. F. Pereira (2003-2023)",
 	"hwspeedy(2024-)",
@@ -370,11 +387,14 @@ void cb_about()
 	"",
 	"Packaging by:",
 	"Topazus (Fedora/Redhat branches)",
-	"Yochananmargos (Arch branches)",
+	"Yochananmargos (Arch+Manjaro)",
 	"hosiet (Debian/Ubuntu branches)",
 	"david-geiger (Mageia)",
 	"Kieltux (Opensuse/Suse branches)",
 	"AngryPenguinPL (OpenMandriva)",
+	"quincyf467 (Gentoo)",
+	"terryn94 (PCLinuxOS)",
+	"bjornfor (NixOS+NIX packages)",
 	"",
         NULL
     };
@@ -390,7 +410,34 @@ void cb_about()
 
     copyright = g_strdup_printf("Copyright \302\251 2003-2023 L. A. F. Pereira\nCopyright \302\251 2024-%d Hardinfo2 Project\n\n\n\n", HARDINFO2_COPYRIGHT_LATEST_YEAR);
 
-    gtk_about_dialog_set_version(GTK_ABOUT_DIALOG(about), VERSION);
+    path = g_build_filename(g_get_user_config_dir(), "hardinfo2","blobs-update-version.json", NULL);
+    fd = open(path,O_RDONLY);
+    if(fd>=0){
+        char *buf=NULL;
+	struct stat st;
+	stat(path,&st);
+	if(st.st_size>0){
+	    buf=g_malloc(st.st_size+1);
+	    if(buf){
+	        int i=read(fd, buf, st.st_size);
+	        if(i>0){
+		    buf[st.st_size]=0;
+		    char *s=strstr(buf,"\"latest-program-version\"");
+	            if(s && sscanf(s,"\"latest-program-version\":\"%u.%u.%u\"",&u1,&u2,&u3)==3) latest_ver=u1*10000+u2*100+u3;
+	        }
+	    }
+        }
+        close(fd);
+	g_free(buf);
+    }
+    free(path);
+    if(sscanf(VERSION,"%u.%u.%u",&a1,&a2,&a3)==3) app_ver=a1*10000+a2*100+a3;
+    if(app_ver && (latest_ver > app_ver)){
+        version=g_strdup_printf("%s (Update available: %u.%u.%u)",VERSION,u1,u2,u3);
+    }else{
+      version=VERSION;
+    }
+    gtk_about_dialog_set_version(GTK_ABOUT_DIALOG(about), version);
     gtk_about_dialog_set_copyright(GTK_ABOUT_DIALOG(about), copyright);
     gtk_about_dialog_set_comments(GTK_ABOUT_DIALOG(about),
 				  _("System Information and Benchmark"));

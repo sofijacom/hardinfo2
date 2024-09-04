@@ -25,7 +25,7 @@ Server code can be found here: [https://github.com/hardinfo2/server](https://git
 
 Packaging status
 --------------
-[![Packaging status](https://repology.org/badge/vertical-allrepos/hardinfo2.svg?columns=3)](https://repology.org/project/hardinfo2/versions)
+[![Packaging status](https://hardinfo2.org/repology.svg)](https://hardinfo2.org/repology.svg)
 
 Prebuilds: [Downloads](https://hardinfo2.org/github?latest_prerelease)
 
@@ -36,12 +36,13 @@ Dependencies
 - Zlib
 - glib JSON
 - Libsoup3 >=3.00 or Libsoup24 >=2.42 (LS24: cmake -DHARDINFO2_LIBSOUP3=0 ..)
+- Qt5 >=5.10 (disable QT5/OpenGL: cmake -DHARDINFO2_QT5=0 ..)
 
 Building and installing
 -----------------------
 **Debian/Ubuntu/Mint/PopOS**
 - sudo apt install git cmake build-essential gettext curl
-- sudo apt install libjson-glib-dev zlib1g-dev libsoup2.4-dev libgtk-3-dev libglib2.0-dev
+- sudo apt install libjson-glib-dev zlib1g-dev libsoup2.4-dev libgtk-3-dev libglib2.0-dev libqt5opengl5-dev qtbase5-dev
 - sudo apt install libsoup-3.0-dev  (might fail if not available on distro - OK)
 - git clone https://github.com/hardinfo2/hardinfo2
 - cd hardinfo2
@@ -58,7 +59,7 @@ Building and installing
 * NOTE: CentOS 7 needs epel-release and cmake3 instead of cmake - use cmake3 instead of cmake
 - sudo yum install epel-release  (only CentOS 7)
 - sudo yum install git cmake gcc gcc-c++ gettext rpmdevtools curl
-- sudo yum install json-glib-devel zlib-devel libsoup-devel gtk3-devel
+- sudo yum install json-glib-devel zlib-devel libsoup-devel gtk3-devel qt5-qtbase-devel
 - sudo yum install libsoup3-devel  (might fail if not available on distro - OK)
 - git clone https://github.com/hardinfo2/hardinfo2
 - cd hardinfo2
@@ -72,6 +73,7 @@ Building and installing
 - hardinfo2
 
 **openSUSE**: use zypper instead of yum, zypper --no-gpg-checks install ./hardinfo2-*
+libqt5-qtbase-devel instead of qt5-qtbase-devel
 
 **ArchLinux/Garuda/Manjaro - AUR Package**
  - git clone https://aur.archlinux.org/hardinfo2 (hardinfo2-git for unstable master for developers)
@@ -93,10 +95,9 @@ Most hardware is detected automatically by Hardinfo2, but some might need manual
 - **xdg-utils**: xdg_open is used to open your browser for bugs, homepage & links.
 - **iperf3**: iperf3 is used to benchmark internal network speed.
 - **fwupd**: fwupd is used to read and display information about firmware in system.
+- **Service**: Service loads SPD modules (at24/ee1004/spd5118) to display SPD info for your DIMMs memory. Show addresses for iomem+ioports.
 
 **User can install/setup these depending on hardware**
-- **eeprom module**: To display SPD info about your currently installed DIMMs memory.
-Load with `modprobe eeprom/at24/ee1004` and refresh the module screen.
 - **hddtemp**: To obtain the hard disk drive temperature, be sure to run hddtemp
 in daemon mode, using the default port.
 - **apcaccess**: apcaccess is used for battery information.

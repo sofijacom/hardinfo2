@@ -126,6 +126,8 @@ gchar *input_list = NULL;
 gboolean storage_no_nvme = FALSE;
 gchar *storage_list = NULL;
 gchar *battery_list = NULL;
+gchar *powerstate=NULL;
+gchar *gpuname=NULL;
 
 /* in dmi_memory.c */
 gchar *memory_devices_get_info();
@@ -171,24 +173,21 @@ gchar *processor_describe_default(GSList * processors)
 
     cpu_procs_cores_threads_nodes(&packs, &cores, &threads, &nodes);
 
-    /* NOTE: If this is changed, look at get_cpu_desc() in bench_results.c! */
-
-    /* if topology info was available, else fallback to old method */
     if (cores > 0) {
         packs_fmt = ngettext("%d physical processor", "%d physical processors", packs);
         cores_fmt = ngettext("%d core", "%d cores", cores);
         threads_fmt = ngettext("%d thread", "%d threads", threads);
         if (nodes > 1) {
             nodes_fmt = ngettext("%d NUMA node", "%d NUMA nodes", nodes);
-            full_fmt = g_strdup_printf(_(/*/NP procs; NC cores across NN nodes; NT threads*/ "%s; %s across %s; %s"), packs_fmt, cores_fmt, nodes_fmt, threads_fmt);
-            ret = g_strdup_printf(full_fmt, packs, cores * nodes, nodes, threads);
+            full_fmt = g_strdup_printf("%s; %s across %s; %s", packs_fmt, cores_fmt, nodes_fmt, threads_fmt);
+            ret = g_strdup_printf(full_fmt, packs, cores, nodes, threads);
         } else {
-            full_fmt = g_strdup_printf(_(/*/NP procs; NC cores; NT threads*/ "%s; %s; %s"), packs_fmt, cores_fmt, threads_fmt);
+	    full_fmt = g_strdup_printf("%s; %s; %s", packs_fmt, cores_fmt, threads_fmt);
             ret = g_strdup_printf(full_fmt, packs, cores, threads);
         }
         g_free(full_fmt);
         return ret;
-    } else {
+    } else { //fallback to old method
         return processor_describe_by_counting_names(processors);
     }
 }
@@ -343,6 +342,23 @@ gchar *get_processor_count(void)
     scan_processors(FALSE);
 
     return g_strdup_printf("%d", g_slist_length(processors));
+}
+
+gchar *get_power_state(void)
+{
+    scan_battery(FALSE);
+    if(!powerstate) return g_strdup("AC");
+    return g_strdup(powerstate);
+}
+gchar *get_gpuname(void)
+{
+    scan_gpu(FALSE);
+    if(!gpuname) return g_strdup("Error");
+    if(strlen(gpuname)>4 && gpuname[3]=='=') {
+      gchar *t=strreplace(g_strdup(gpuname+4),"\n","");
+      return t;
+    }
+    return g_strdup(gpuname);
 }
 
 /* TODO: maybe move into processor.c along with processor_name() etc.
@@ -528,9 +544,13 @@ gchar *get_motherboard(void)
         ret = board_part;
     else if (product_part)
         ret = product_part;
-    else
-        ret = g_strdup(_("(Unknown)"));
-
+    else {
+        if(strstr(module_call_method("computer::getOSKernel"),"WSL2")){
+	    ret = g_strdup(_("WSL2"));
+        } else {
+            ret = g_strdup(_("(Unknown)"));
+	}
+    }
     g_free(board_name);
     g_free(board_vendor);
     g_free(board_version);
@@ -564,6 +584,8 @@ const ShellModuleMethod *hi_exported_methods(void)
         {"getInputDevices", get_input_devices},
         {"getMotherboard", get_motherboard},
         {"getGPUList", get_gpu_summary},
+        {"getPowerState", get_power_state},
+        {"getGPUname", get_gpuname},
         {NULL},
     };
 

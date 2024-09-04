@@ -28,16 +28,30 @@ gchar *CN() { \
     return benchmark_include_results(bench_results[BID], BN); \
 }
 
-#define BENCH_SCAN_SIMPLE(SN, BF, BID, BN)  \
+#if(HARDINFO2_QT5)
+#define BENCH_SCAN_SIMPLE(SN, BF, BID, BN)	\
 void SN(gboolean reload) { \
     static gboolean scanned=FALSE; \
     if(params.aborting_benchmarks) return; \
-    if (reload || bench_results[BID].result<=0.0) scanned = FALSE; \
+    if(reload || bench_results[BID].result<=0.0) scanned = FALSE; \
     if(reload){DEBUG("BENCH SCAN RELOAD %s\n",BN);} else if(scanned) {DEBUG("BENCH SCAN OK %s\n",BN);}else{DEBUG("BENCH SCAN %s\n",BN);} \
-    if (scanned) return; \
-    do_benchmark(BF, BID);			\
+    if(scanned) return; \
+    if(BID!=BENCHMARK_OPENGL || params.gui_running || params.run_benchmark) \
+        do_benchmark(BF, BID); \
     scanned = TRUE; \
 }
+#else
+#define BENCH_SCAN_SIMPLE(SN, BF, BID, BN)	\
+void SN(gboolean reload) { \
+    static gboolean scanned=FALSE; \
+    if(params.aborting_benchmarks) return; \
+    if(reload || bench_results[BID].result<=0.0) scanned = FALSE; \
+    if(reload){DEBUG("BENCH SCAN RELOAD %s\n",BN);} else if(scanned) {DEBUG("BENCH SCAN OK %s\n",BN);}else{DEBUG("BENCH SCAN %s\n",BN);} \
+    if(scanned) return; \
+    do_benchmark(BF, BID); \
+    scanned = TRUE; \
+}
+#endif
 
 #define BENCH_SIMPLE(BID, BN, BF, R) \
     BENCH_CALLBACK(callback_##BF, BN, BID, R); \
@@ -54,6 +68,9 @@ BENCH_SIMPLE(BENCHMARK_BLOWFISH_CORES, "CPU Blowfish (Multi-core)", benchmark_bf
 BENCH_SIMPLE(BENCHMARK_ZLIB, "CPU Zlib", benchmark_zlib, 1);
 BENCH_SIMPLE(BENCHMARK_CRYPTOHASH, "CPU CryptoHash", benchmark_cryptohash, 1);
 BENCH_SIMPLE(BENCHMARK_IPERF3_SINGLE, "Internal Network Speed", benchmark_iperf3_single, 1);
+#if(HARDINFO2_QT5)
+BENCH_SIMPLE(BENCHMARK_OPENGL, "GPU OpenGL Drawing", benchmark_opengl, 1);
+#endif
 BENCH_SIMPLE(BENCHMARK_SBCPU_SINGLE, "SysBench CPU (Single-thread)", benchmark_sbcpu_single, 1);
 BENCH_SIMPLE(BENCHMARK_SBCPU_ALL, "SysBench CPU (Multi-thread)", benchmark_sbcpu_all, 1);
 BENCH_SIMPLE(BENCHMARK_SBCPU_QUAD, "SysBench CPU (Four threads)", benchmark_sbcpu_quad, 1);
@@ -104,7 +121,11 @@ static char *entries_english_name[] = {
             "SysBench Memory (Two threads)",
             "SysBench Memory (Quad threads)",
             "SysBench Memory (Multi-thread)",
-            "GPU Drawing"};
+            "GPU Drawing"
+#if(HARDINFO2_QT5)
+	    ,"GPU OpenGL Drawing"
+#endif
+};
 
 
 static ModuleEntry entries[] = {
@@ -252,6 +273,16 @@ static ModuleEntry entries[] = {
             scan_benchmark_gui,
             MODULE_FLAG_NO_REMOTE,
         },
+#if(HARDINFO2_QT5)
+    [BENCHMARK_OPENGL] =
+        {
+            N_("GPU OpenGL Drawing"),
+            "monitor.png",
+            callback_benchmark_opengl,
+            scan_benchmark_opengl,
+            MODULE_FLAG_NO_REMOTE,
+        },
+#endif
     {NULL}};
 
 const gchar *hi_note_func(gint entry)
@@ -276,12 +307,18 @@ const gchar *hi_note_func(gint entry)
     case BENCHMARK_BLOWFISH_THREADS:
     case BENCHMARK_BLOWFISH_CORES:
     case BENCHMARK_ZLIB:
-    case BENCHMARK_GUI:
     case BENCHMARK_FFT:
     case BENCHMARK_RAYTRACE:
     case BENCHMARK_FIB:
     case BENCHMARK_NQUEENS:
         return _("Results in HIMarks. Higher is better.");
+    case BENCHMARK_GUI:
+        return _("Results in HIMarks. Higher is better.\n"
+		 "Many Desktop Environments only uses software.");
+#if(HARDINFO2_QT5)
+    case BENCHMARK_OPENGL:
+        return _("Results in FPS. Higher is better.");
+#endif
     }
 
     return NULL;

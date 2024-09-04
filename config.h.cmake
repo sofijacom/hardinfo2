@@ -17,6 +17,7 @@
 #cmakedefine HARDINFO2_DEBUG	@HARDINFO2_DEBUG@
 #cmakedefine CMAKE_BUILD_TYPE 	@CMAKE_BUILD_TYPE@
 #cmakedefine HARDINFO2_LIBSOUP3 @HARDINFO2_LIBSOUP3@
+#cmakedefine HARDINFO2_QT5      @HARDINFO2_QT5@
 
 #define Release 1
 #define ON 1
@@ -24,6 +25,9 @@
 
 #if !defined(HARDINFO2_LIBSOUP3)
   #define HARDINFO2_LIBSOUP3 0
+#endif
+#if !defined(HARDINFO2_QT5)
+  #define HARDINFO2_QT5 0
 #endif
 
 #if defined(HARDINFO2_DEBUG) && (HARDINFO2_DEBUG==1)
@@ -39,7 +43,7 @@
   #endif
 #endif	/* HARDINFO2_DEBUG */
 
-#define ENABLE_BINRELOC 1
+#define ENABLE_BINRELOC 0
 #define HAS_LINUX_WE 1
 
 #cmakedefine01 HAS_LIBSENSORS

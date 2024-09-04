@@ -447,7 +447,7 @@ gchar *caches_summary(GSList * processors)
     return ret;
 }
 
-#define PROC_SCAN_READ_BUFFER_SIZE 1024
+#define PROC_SCAN_READ_BUFFER_SIZE 2048
 GSList *processor_scan(void)
 {
     GSList *procs = NULL, *l = NULL;
@@ -692,7 +692,7 @@ gchar *dmi_socket_info() {
                 _("Socket Information"), _("Result"),
                 (getuid() == 0)
                 ? _("(Not available)")
-                : _("(Not available; Perhaps try running HardInfo as root.)") );
+                : _("(Not available; Perhaps try running hardinfo2 as root.)") );
     } else {
         ret = g_strdup("");
         for(i = 0; i < hl->count; i++) {

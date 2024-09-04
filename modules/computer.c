@@ -398,14 +398,8 @@ static gchar *detect_machine_type(void)
 
     chassis = dtr_get_string("/model", 0);
     if (chassis) {
-        if (strstr(chassis, "Raspberry Pi") != NULL
-            || strstr(chassis, "ODROID") != NULL
-            || strstr(chassis, "Firefly ROC") != NULL
-            /* FIXME: consider making a table when adding more models */ ) {
-                g_free(chassis);
-                return g_strdup(_("Single-board computer"));
-        }
-        g_free(chassis);
+         g_free(chassis);
+         return g_strdup(_("Single-board computer"));
     }
 
     if (g_file_test("/proc/pmu/info", G_FILE_TEST_EXISTS))
@@ -450,7 +444,8 @@ static gchar *detect_machine_type(void)
         g_dir_close(dir);
     }
 
-    /* FIXME: check if batteries are found using /proc/apm */
+    if(strstr(module_call_method("computer::getOSKernel"),"WSL2"))
+        return g_strdup("WSL2");
 
     return g_strdup(_("Unknown physical machine type"));
 }
@@ -510,6 +505,10 @@ gchar *computer_get_virtualization(void)
     if (strstr(tmp, "VirtualBox") != NULL) {
         g_free(tmp);
         return g_strdup(_("Virtual (VirtualBox)"));
+    }
+    if (strstr(tmp, "VMware") != NULL) {
+        g_free(tmp);
+        return g_strdup(_("Virtual (VMware)"));
     }
     g_free(tmp);
 
@@ -594,13 +593,12 @@ gchar *callback_os(void)
     info_set_view_type(info, SHELL_VIEW_DETAIL);
 
     distro_icon = computer->os->distroid
-                      ? idle_free(g_strdup_printf("distros/%s.svg",
-                                                  computer->os->distroid))
-                      : NULL;
+       ? idle_free(g_strdup_printf("distros/%s.svg",computer->os->distroid))
+       : NULL;
     distro = computer->os->distrocode
-                      ? idle_free(g_strdup_printf("%s (%s)",
-                                  computer->os->distro, computer->os->distrocode))
-                      : computer->os->distro;
+       ? idle_free(g_strdup_printf("%s (%s)",
+         computer->os->distro, computer->os->distrocode))
+       : computer->os->distro;
 
     struct InfoGroup *version_group =
     info_add_group(

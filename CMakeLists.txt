@@ -2,12 +2,15 @@ cmake_minimum_required(VERSION 3.0.2)
 cmake_policy(VERSION 3.0.2)
 project(hardinfo2)
 
-set(HARDINFO2_VERSION "2.1.12")
+set(HARDINFO2_VERSION "2.1.15")
 
+option(HARDINFO2_SERVICE "Build with service support" 1)
 option(HARDINFO2_GTK3 "Build for GTK3 (0/off for GTK2)" 1)
 option(HARDINFO2_LIBSOUP3 "Build for libsoup-3.0 (0/off for libsoup-2.4)" 1)
+option(HARDINFO2_QT5 "Build opengl benchmark for QT5 " 1)
 
 SET(CMAKE_INSTALL_PREFIX "/usr")
+SET(HARDINFO2_SYSTEMV 0)
 
 SET(CMAKE_MODULE_PATH  "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(GNUInstallDirs)
@@ -48,16 +51,19 @@ elseif(${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "sh[3-5]")
 	set(HARDINFO2_ARCH "sh")
 elseif(${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "(riscv|riscv32|riscv64)")
 	set(HARDINFO2_ARCH "riscv")
+elseif(${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "e2k")
+	set(HARDINFO2_ARCH "e2k")
 else()
 	message(FATAL_ERROR "Unsupported architecture: ${CMAKE_HOST_SYSTEM_PROCESSOR}")
 endif()
 
-add_definitions(-DLOCALEDIR="${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LOCALEDIR}")
-message(STATUS "LOCALEDIR = ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LOCALEDIR}")
+add_definitions(-DLOCALEDIR="${CMAKE_INSTALL_FULL_LOCALEDIR}")
+message(STATUS "LOCALEDIR = ${CMAKE_INSTALL_FULL_LOCALEDIR}")
 
 message(STATUS "Building HardInfo2 for architecture: ${HARDINFO2_OS}-${HARDINFO2_ARCH}")
 
-add_definitions("-std=gnu89")
+#add_definitions("-std=gnu89")
+#add_definitions("-fanalyzer")
 add_definitions("-Wextra")
 add_definitions("-Wno-missing-field-initializers")
 add_definitions("-Wformat")
@@ -67,26 +73,32 @@ set(PACKAGE_LIBSOUP2_MINVERSION 2.42)
 set(PACKAGE_LIBGLIB2_MINVERSION 2.24)
 
 #########################CPack PACKAGING SETUP###############################
+if(EXISTS "/etc/os-release")
+  file(STRINGS /etc/os-release distro REGEX "^NAME=")
+  file(STRINGS /etc/os-release disversion REGEX "^VERSION_ID=")
+  file(STRINGS /etc/os-release disversioncode REGEX "^VERSION_CODENAME=")
+else()
+  set(distro "Linux")
+  set(disversion "99")
+  set(disversioncode "Linux")
+endif()
 set(RPM 0)
-file(STRINGS /etc/os-release distro REGEX "^NAME=")
 string(REGEX REPLACE "NAME=" "" distro "${distro}")
 string(REGEX REPLACE "\"" "" distro "${distro}")
 string(REGEX REPLACE "/" "" distro "${distro}")
 string(REGEX REPLACE " " "" distro "${distro}")
-file(STRINGS /etc/os-release disversion REGEX "^VERSION_ID=")
 string(REGEX REPLACE "VERSION_ID=" "" disversion "${disversion}")
 string(COMPARE EQUAL "${disversion}" "" result)
 if(result)
   #sid/rawhide with no version - use project name
   message("-- Found no distro version - Using codename")
-  file(STRINGS /etc/os-release disversion REGEX "^VERSION_CODENAME=")
-  string(REGEX REPLACE "VERSION_CODENAME=" "" disversion "99_${disversion}")
+  string(REGEX REPLACE "VERSION_CODENAME=" "" disversion "99_${disversioncode}")
 endif()
 string(REGEX REPLACE "\"" "" disversion "${disversion}")
 string(REGEX REPLACE "/" "" disversion "${disversion}")
 string(REGEX REPLACE " " "" disversion "${disversion}")
 #RPM Distro's
-if(${distro} MATCHES "Alma*" OR ${distro} MATCHES "Rocky*" OR ${distro} MATCHES "Fedora*" OR ${distro} MATCHES "Red*" OR ${distro} MATCHES "CentOS*" OR ${distro} MATCHES "Oracle*" OR ${distro} MATCHES "openSUSE*" OR ${distro} MATCHES "SUSE*")
+if(${distro} MATCHES "Alma*" OR ${distro} MATCHES "Rocky*" OR ${distro} MATCHES "Fedora*" OR ${distro} MATCHES "Red*" OR ${distro} MATCHES "CentOS*" OR ${distro} MATCHES "Oracle*" OR ${distro} MATCHES "openSUSE*" OR ${distro} MATCHES "SUSE*" OR ${distro} MATCHES "PCLinuxOS*")
   set(RPM 1)
 endif()
 #Package architecture
@@ -131,23 +143,46 @@ endif()
 if(${disversion} LESS 6.99)
   if((${distro} MATCHES "Red*" OR ${distro} MATCHES "CentOS*" OR ${distro} MATCHES "Oracle*" OR ${distro} MATCHES "openSUSE*" OR ${distro} MATCHES "SUSE*"))
     message("RPM EL6 - GTK2 - deprecated - support will end at any time")
-    message("RPM EL6 - LS24 - deprecated version 2.34.3 - but ok")
     set(HARDINFO2_GTK3 0)
+    message("RPM EL6 - LS24 - deprecated version 2.34.3 - but ok")
     set(PACKAGE_LIBSOUP2_MINVERSION 2.34.3)
+    set(HARDINFO2_SYSTEMV 1)
+    message("RPM EL6 - no QT5 - Disabling opengl benchmarks")
+    set(HARDINFO2_QT5 0)
   endif()
+endif()
+
+#Fedora 23
+if(${distro}${disversion} MATCHES "Fedora23")
+    message("FC23 - no QT5 - Disabling opengl benchmarks")
+    set(HARDINFO2_QT5 0)
 endif()
 
 #debian 7
 if(${distro}${disversion} MATCHES "DebianGNULinux7")
     message("DEB 7 - GTK2 to avoid c11 for ubergraph - deprecated - support will end at any time")
     message("DEB 7 - LS24 - deprecated version 2.34.3 - but ok")
+    message("DEB 7 - no QT5 - Disabling opengl benchmarks")
     set(HARDINFO2_GTK3 0)
     set(PACKAGE_LIBSOUP2_MINVERSION 2.34.3)
+    set(HARDINFO2_SYSTEMV 1)
+    set(HARDINFO2_QT5 0)
 endif()
 
 #debian 8
 if(${distro}${disversion} MATCHES "DebianGNULinux8")
     message("DEB 8 - GTK3 version 3.14.5 is low - Themes disabled")
+    message("DEB 8 - no QT5 - Disabling opengl benchmarks")
+    set(HARDINFO2_QT5 0)
+endif()
+
+#debian 9
+if(${distro}${disversion} MATCHES "DebianGNULinux99")
+else()
+    if(${distro}${disversion} MATCHES "DebianGNULinux9")
+        message("DEB 9 - QT5 too low - Disabling opengl benchmarks")
+        set(HARDINFO2_QT5 0)
+    endif()
 endif()
 
 #debian ->11
@@ -156,6 +191,23 @@ if(${disversion} LESS 11.99)
     message("DEB ->11 - LS24")
     set(HARDINFO2_LIBSOUP3 0)
   endif()
+  if(${distro} MATCHES "RaspbianGNULinux")
+    message("DEB ->11 - LS24")
+    set(HARDINFO2_LIBSOUP3 0)
+  endif()
+endif()
+#pureos ->10 (debian 11 or less)
+if(${disversion} LESS 10.99)
+  if(${distro} MATCHES "PureOS")
+    message("PureOS ->10 - LS24")
+    set(HARDINFO2_LIBSOUP3 0)
+  endif()
+endif()
+
+#ubuntu 16
+if(${distro}${disversion} MATCHES "Ubuntu16")
+    message("Ubuntu 16 - no QT5 - Disabling opengl benchmarks")
+    set(HARDINFO2_QT5 0)
 endif()
 
 #ubuntu 20.04
@@ -164,6 +216,21 @@ if(${disversion} LESS 20.99)
     message("Ubuntu ->20.xx - LS24")
     set(HARDINFO2_LIBSOUP3 0)
   endif()
+endif()
+
+#PCLinuxOS
+if(${distro} MATCHES "PCLinux")
+    set(HARDINFO2_SYSTEMV 1)
+endif()
+
+#Devuan
+if(${distro} MATCHES "Devuan")
+    set(HARDINFO2_SYSTEMV 1)
+endif()
+
+#WSL 1/2
+if(EXISTS "/bin/wslinfo")
+    message("WSL Detected")
 endif()
 
 
@@ -178,8 +245,12 @@ if(${CMAKE_BUILD_TYPE} MATCHES [Dd]ebug)
 	   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
         endif()
 endif()
+
 add_subdirectory(po)
 
+if(HARDINFO2_QT5)
+  add_subdirectory(deps/qgears2)
+endif()
 
 include(FindPkgConfig)
 if (HARDINFO2_GTK3)
@@ -287,6 +358,29 @@ set(MODULE_network_SOURCES
 	modules/network/nfs.c
 	modules/network/samba.c
 )
+if(HARDINFO2_QT5)
+set(MODULE_benchmark_SOURCES
+	modules/benchmark.c
+	modules/benchmark/bench_util.c
+	modules/benchmark/blowfish.c
+	modules/benchmark/blowfish2.c
+	modules/benchmark/cryptohash.c
+	modules/benchmark/fbench.c
+	modules/benchmark/fftbench.c
+	modules/benchmark/fft.c
+	modules/benchmark/fib.c
+	modules/benchmark/md5.c
+	modules/benchmark/nqueens.c
+	modules/benchmark/raytrace.c
+	modules/benchmark/sha1.c
+	modules/benchmark/zlib.c
+	modules/benchmark/sysbench.c
+	modules/benchmark/iperf3.c
+	modules/benchmark/opengl.c
+	modules/benchmark/drawing.c
+	modules/benchmark/guibench.c
+)
+else()
 set(MODULE_benchmark_SOURCES
 	modules/benchmark.c
 	modules/benchmark/bench_util.c
@@ -307,6 +401,7 @@ set(MODULE_benchmark_SOURCES
 	modules/benchmark/drawing.c
 	modules/benchmark/guibench.c
 )
+endif()
 
 set_source_files_properties(
 	modules/benchmark/blowfish.c
@@ -320,7 +415,6 @@ set_source_files_properties(
 set_source_files_properties(
 	modules/devices/monitors.c
 	modules/devices/dmi_memory.c
-#	modules/devices/spd-decode.c
 	hardinfo2/problem_marker.c
 	hardinfo2/hinote_util.c
 	PROPERTIES
@@ -471,6 +565,23 @@ endif()
 configure_file(config.h.cmake ${CMAKE_BINARY_DIR}/config.h @ONLY)
 configure_file(hardinfo2.desktop.cmake ${CMAKE_BINARY_DIR}/hardinfo2.desktop @ONLY)
 
+if(HARDINFO2_SERVICE)
+    #cannot use CMAKE_INSTALL_LIBDIR due to distros with dual lib (arch)-gnu-linux,lib64
+    set(CMAKE_INSTALL_SERVICEDIR "/usr/lib" CACHE PATH "Path where the systemd service file gets installed")
+    message("ServiceDir=" ${CMAKE_INSTALL_SERVICEDIR})
+
+    if(${HARDINFO2_SYSTEMV})
+        install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/tools/hardinfo2 DESTINATION /etc/init.d/
+        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+    else()
+        install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/tools/hardinfo2.service DESTINATION ${CMAKE_INSTALL_SERVICEDIR}/systemd/system/)
+    endif()
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tools/postinst ${CMAKE_CURRENT_BINARY_DIR}/packaging/postinst)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tools/prerm ${CMAKE_CURRENT_BINARY_DIR}/packaging/prerm)
+endif()
+
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/tools/org.hardinfo2.hardinfo2.metainfo.xml DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/metainfo/)
+
 install(TARGETS hardinfo2 ${HARDINFO2_MODULES}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/hardinfo2/modules
@@ -497,6 +608,7 @@ install(FILES pixmaps/hardinfo2.png
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps
 	PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
 )
+
 
 ########################CPack PACKAGE BUILDING###########################
 
@@ -533,6 +645,11 @@ else()
     SET(PACKAGE_GTK "${PACKAGE_GTK2} (>=2.20)")
 endif()
 SET(CPACK_RPM_PACKAGE_DEPENDS "libjson-glib-1.0-0, zlib, ${PACKAGE_LS}, ${PACKAGE_GTK}, libglib2.0-0 (>=2.10)")
+#RPM-SERVICE
+if(HARDINFO2_SERVICE)
+    SET(CPACK_RPM_POST_INSTALL_SCRIPT_FILE "${CMAKE_CURRENT_BINARY_DIR}/packaging/postinst")
+    SET(CPACK_RPM_PRE_UNINSTALL_SCRIPT_FILE "${CMAKE_CURRENT_BINARY_DIR}/packaging/prerm")
+endif()
 
 #DEB
 SET(CPACK_DEBIAN_PACKAGE_REPLACES "hardinfo")
@@ -552,5 +669,9 @@ else()
     SET(PACKAGE_GTK "${PACKAGE_GTK2} (>=2.20)")
 endif()
 SET(CPACK_DEBIAN_PACKAGE_DEPENDS "libjson-glib-1.0-0, zlib1g, ${PACKAGE_LS}, ${PACKAGE_GTK}")
+#DEB-SERVICE
+if(HARDINFO2_SERVICE)
+    SET(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA "${CMAKE_CURRENT_BINARY_DIR}/packaging/postinst;${CMAKE_CURRENT_BINARY_DIR}/packaging/prerm")
+endif()
 
 INCLUDE(CPack)
