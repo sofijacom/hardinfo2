@@ -41,13 +41,26 @@ gchar *processor_name(GSList * processors) {
         char *vendor;
         char *soc;
     } dt_compat_searches[] = {
-        { "thead,light-lpi4a", "T-Head", "TH1520" },
-        { "starfive,visionfive-2", "StarFive", "JH7110" },
+        { "allwinner,sun201-d1", "Allwinner", "SUN20I-D1" },
+        { "sifive,fu540", "SiFive", "FU540" },
+        { "sifive,fu740", "SiFive", "FU740" },
+        { "sophgo,sg2042", "Sophgo", "SG2042" },
+        { "sophgo,cv1800b", "Sophgo", "CV1800B" },
+        { "sophgo,cv1812h", "Sophgo", "CV1812H" },
+        { "starfive,jh7100", "StarFive", "JH7100" },
         { "starfive,jh7110", "StarFive", "JH7110" },
+        { "starfive,visionfive-2", "StarFive", "JH7110" },
+        { "thead,c910", "T-Head", "C910" },
+        { "thead,light-lpi4a", "T-Head", "TH1520" },
 	//
         { "allwinner,", "Allwinner", UNKSOC },
+        { "canaan,", "Canaan", UNKSOC },
+        { "microchip,", "MicroChip", UNKSOC },
+        { "renesas,", "Renesas", UNKSOC },
+        { "sifive,", "SiFive", UNKSOC },
+        { "sophgo,", "Sophgo", UNKSOC },
+        { "starfive,", "StarFive", UNKSOC },
         { "thead,", "T-Head", UNKSOC },
-        { "allwinner,", "Allwinner", UNKSOC },
         { NULL, NULL }
     };
     gchar *ret = NULL;
@@ -60,14 +73,19 @@ gchar *processor_name(GSList * processors) {
         i = 0;
         while(dt_compat_searches[i].search_str != NULL) {
             if (strstr(compat, dt_compat_searches[i].search_str) != NULL) {
-                ret = g_strdup_printf("RISC-V %s %s", dt_compat_searches[i].vendor, dt_compat_searches[i].soc);
+	        if(strstr(dt_compat_searches[i].soc,"Unknown"))
+		    ret = g_strdup_printf("RISC-V %s %s (%s)", dt_compat_searches[i].vendor, dt_compat_searches[i].soc, compat);
+		else
+                    ret = g_strdup_printf("RISC-V %s %s", dt_compat_searches[i].vendor, dt_compat_searches[i].soc);
                 break;
             }
             i++;
         }
+        if(!ret) ret = g_strdup_printf("RISC-V Processor (%s)", compat);
+        g_free(compat);
     }
-    g_free(compat);
-    if(!ret) g_strdup("RISC-V Processor");
+
+    if(!ret) ret = g_strdup("RISC-V Processor (NoDT)");
     return ret;
 }
 

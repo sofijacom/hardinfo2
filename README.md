@@ -21,6 +21,8 @@ Status
 - Features: Online database for exchanging benchmark results.
 - Development: Currently done by community, hwspeedy maintains
 
+Latest Release News: [https://hardinfo2.org/news](https://hardinfo2.org/news)
+
 Server code can be found here: [https://github.com/hardinfo2/server](https://github.com/hardinfo2/server)
 
 Packaging status
@@ -52,7 +54,7 @@ Building and installing
 - cmake ..
 - make package -j (Creates package so you do not pollute your distro and it can be updated by distro releases)
 - sudo apt install ./hardinfo2_*  (Use reinstall instead of install if already installed)
-- sudo apt install lm-sensors sysbench lsscsi mesa-utils dmidecode udisks2 xdg-utils iperf3 fwupd
+- sudo apt install lm-sensors sysbench lsscsi mesa-utils dmidecode udisks2 xdg-utils iperf3 fwupd x11-xserver-utils vulkan-tools
 - hardinfo2
 
 **Fedora/CentOS/RedHat/Rocky/Alma/Oracle**
@@ -69,14 +71,14 @@ Building and installing
 - cmake ..
 - make package -j (Creates package so you do not pollute your distro and it can be updated by distro releases)
 - sudo yum install ./hardinfo2-*  (Use reinstall instead of install if already installed)
-- sudo yum install lm_sensors sysbench lsscsi glx-utils dmidecode udisks2 xdg-utils iperf3 fwupd
+- sudo yum install lm_sensors sysbench lsscsi glx-utils dmidecode udisks2 xdg-utils iperf3 fwupd xrandr vulkan-tools
 - hardinfo2
 
 **openSUSE**: use zypper instead of yum, zypper --no-gpg-checks install ./hardinfo2-*
 libqt5-qtbase-devel instead of qt5-qtbase-devel
 
-**ArchLinux/Garuda/Manjaro - AUR Package**
- - git clone https://aur.archlinux.org/hardinfo2 (hardinfo2-git for unstable master for developers)
+**ArchLinux/Garuda/Manjaro/Endeavour - AUR Package**
+ - git clone https://aur.archlinux.org/hardinfo2
  - cd hardinfo2
  - makepkg -cis
  - hardinfo2
@@ -86,7 +88,8 @@ Setting up addition tools
 Most hardware is detected automatically by Hardinfo2, but some might need manual set up.
 
 **Package installs these**
-- **sysbench**: is needed to run standard sysbench benchmarks.
+- **sysbench**: is needed to run standard sysbench benchmarks. <br>
+RiscV: The package is not ready yet - build by using the ./tools/build_and_install_sysbench_riscv.sh script from building hardinfo2.
 - **udisks2**: is needed to provide NVME++ informations.
 - **dmi-decode**: is needed to provide DMI informations.
 - **mesa-utils**: is needed to provide opengl and run standard sysbench benchmarks.
@@ -96,6 +99,8 @@ Most hardware is detected automatically by Hardinfo2, but some might need manual
 - **iperf3**: iperf3 is used to benchmark internal network speed.
 - **fwupd**: fwupd is used to read and display information about firmware in system.
 - **Service**: Service loads SPD modules (at24/ee1004/spd5118) to display SPD info for your DIMMs memory. Show addresses for iomem+ioports.
+- **xrandr/x11-xserver-utils**: xrandr is used to read monitor setup
+- **vulkan-tools**: vulkaninfo is used to display vulcan information.
 
 **User can install/setup these depending on hardware**
 - **hddtemp**: To obtain the hard disk drive temperature, be sure to run hddtemp

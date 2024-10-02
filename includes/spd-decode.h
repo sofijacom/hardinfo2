@@ -1,8 +1,6 @@
 /*
- * spd-decode.c, spd-vendors.c
- * Copyright (c) 2010 L. A. F. Pereira
- * modified by Ondrej Čerman (2019)
- * modified by Burt P. (2019)
+ * spd-decode.h including SPD vendor database
+ * Copyright (c) 2024 hwspeedy
  *
  * Based on decode-dimms.pl
  * Copyright 1998, 1999 Philip Edelbrock <phil@netroedge.com>
@@ -23,6 +21,83 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+
+#define UNKNOWN_MEM_TYPE_STRING _("RAM")
+#define UNKIFNULL2(f) ((f) ? f : _("(Unknown)"))
+#define UNKIFEMPTY2(f) ((*f) ? f : _("(Unknown)"))
+#define STR_IGNORE(str, ignore) if (SEQ(str, ignore)) { *str = 0; null_if_empty(&str); }
+#define GET_RAM_TYPE_STR(rt) (ram_types[(rt < N_RAM_TYPES) ? rt : 0])
+
+typedef enum {
+    UNKNOWN           = 0,
+    DIRECT_RAMBUS     = 1,
+    RAMBUS            = 2,
+    FPM_DRAM          = 3,
+    EDO               = 4,
+    PIPELINED_NIBBLE  = 5,
+    SDR_SDRAM         = 6,
+    MULTIPLEXED_ROM   = 7,
+    DDR_SGRAM         = 8,
+    DDR_SDRAM         = 9,
+    DDR2_SDRAM        = 10,
+    DDR3_SDRAM        = 11,
+    DDR4_SDRAM        = 12,
+    DDR5_SDRAM        = 13,
+    N_RAM_TYPES       = 14
+} RamType;
+
+static const char *ram_types[] = {
+    "Unknown",
+    "Direct Rambus",
+    "Rambus",
+    "FPM DRAM",
+    "EDO",
+    "Pipelined Nibble",
+    "SDR SDRAM",
+    "Multiplexed ROM",
+    "DDR SGRAM",
+    "DDR SDRAM",
+    "DDR2 SDRAM",
+    "DDR3 SDRAM",
+    "DDR4 SDRAM",
+    "DDR5 SDRAM"
+};
+
+typedef uint32_t dmi_mem_size;
+struct dmi_mem_socket;
+typedef struct {
+    unsigned char *bytes;//allocated
+    char dev[32];
+    int spd_size;
+    RamType type;
+    int vendor_bank;
+    int vendor_index;
+    int dram_vendor_bank;
+    int dram_vendor_index;
+    char partno[32];
+    char serialno[32];
+    const char *form_factor;
+    char type_detail[256];
+    dmi_mem_size size_MiB;
+    int spd_rev_major;
+    int spd_rev_minor;
+    int week, year;
+    gboolean ddr4_no_ee1004;
+    int match_score;
+    const char *spd_driver;//link to static const
+    char *vendor_str;//links to static const
+    char *dram_vendor_str;//links to static const
+    struct dmi_mem_socket *dmi_socket;//links
+    const Vendor *vendor;//links
+    const Vendor *dram_vendor;//links
+} spd_data;
+
+GSList *spd_scan();
+gchar *make_spd_section(spd_data *spd);
+void spd_data_free(spd_data *s);
+
+
+
 /* from decode-dimms, in the i2c-tools package:
  * https://mirrors.edge.kernel.org/pub/software/utils/i2c-tools/
  *
@@ -30,7 +105,6 @@
  * as defined in JEP106
  *
  * As of: 13 August 2024
- *
  */
 
 #define VENDORS_BANKS 13

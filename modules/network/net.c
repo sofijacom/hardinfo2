@@ -323,11 +323,6 @@ static void net_get_iface_type(gchar * name, gchar ** type, gchar ** icon, NetIn
     *icon = netdev2type[i].icon;
 }
 
-static gboolean
-remove_net_devices(gpointer key, gpointer value, gpointer data)
-{
-    return g_str_has_prefix(key, "NET");
-}
 
 #ifdef HAS_LINUX_WE
 const char *wifi_bars(int signal, int noise)

@@ -90,8 +90,6 @@ struct _Computer {
     gchar *date_time;
 };
 
-#include "distro_flavors.h"
-
 struct _OperatingSystem {
     gchar *kernel;
     gchar *kcmdline;
@@ -112,8 +110,6 @@ struct _OperatingSystem {
     gchar *boots;
 
     gchar *entropy_avail;
-
-    const DistroFlavor* distro_flavor;
 };
 
 struct _MemoryInfo {

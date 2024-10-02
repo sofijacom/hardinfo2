@@ -88,18 +88,24 @@ name Advanced Micro Devices
     match_string Advanced Micro Devices
     match_string_case AMD
 
-name Alcor Life Extension Foundation
-# Makes devices?
-    name_short Alcor
-    url www.alcor.org
-    match_string ALCOR
-
 name Allwinner Technology
     name_short AllWinner
     url www.allwinnertech.com
     wikipedia Allwinner Technology
     ansi_color 0;97;44
     match_string AllWinner
+
+name AlmaLinux
+    name_short AlmaLinux
+    url www.almalinux.org
+    ansi_color 0;31;40
+    match_string AlmaLinux
+
+name Alpine Linux
+    name_short Alpine Linux
+    url www.alpinelinux.org
+    ansi_color 0;34;107
+    match_string Alpine Linux
 
 name American Megatrends
     name_short AMI
@@ -151,7 +157,7 @@ name Applied Micro Circuits
     match_string_case AMCC
 
 name Arch Linux
-    name_short Arch
+    name_short Arch Linux
     url www.archlinux.org
     ansi_color 0;36;107
     match_string arch linux
@@ -225,6 +231,12 @@ name Biostar Microtech International
     ansi_color 0;31;40
     match_string Biostar
 
+name Bodhi Linux
+    name_short Bodhi Linux
+    url www.bodhilinux.com
+    ansi_color 0;97;42
+    match_string Bodhi Linux
+
 name Bright Micron Technology
     name_short BMT
     match_string Bright Micron
@@ -272,6 +284,12 @@ name CDEmu
     url cdemu.sourceforge.io
     match_string CDEmu
 
+name CentOS
+    name_short CentOS
+    ansi_color 0;34;107
+    url www.centos.org
+    match_string CentOS
+
 name Chengdu Haiguang Integrated Circuit Design
     name_short Hygon
     ansi_color 0;97;104
@@ -289,6 +307,12 @@ name Chicony
 name Cirrus Logic
     url www.cirrus.com
     match_string Cirrus Logic
+
+name Clear Linux
+    name_short Clear Linux
+    ansi_color 0;34;107
+    url www.clearlinux.org
+    match_string Clear Linux
 
 name Coreboot Project
     name_short Coreboot
@@ -345,6 +369,12 @@ name Dell Computer
     note EDID vendor: DEL
     match_string_exact DEL
 
+name Devuan
+    name_short Devuan
+    ansi_color 0;34;107
+    url www.devuan.org
+    match_string Devuan
+
 name Digital Equipment Corporation
     name_short DEC
     note Dead; various parts to Intel, Compaq, HP
@@ -374,6 +404,12 @@ name Embest Technology
     ansi_color 0;96;44
     match_string Embest
 
+name EndeavourOS
+    name_short EndeavourOS
+    url www.endeavouros.com
+    ansi_color 0;33;40
+    match_string EndeavourOS
+
 name eMPIA Technology
     url www.empiatech.com.tw
     match_string_case eMPIA
@@ -400,6 +436,13 @@ name Faraday Technology
     match_string Faraday Technology
     match_string Faraday
 
+name Fedora Linux
+    name_short Fedora
+    ansi_color 0;34;107
+    url www.fedoraproject.com
+    match_string Fedora Linux
+    match_string Fedora
+
 name Fujitsu
     name_short FUJITSU
     url www.fujitsu.com
@@ -413,6 +456,11 @@ name Fuzhou Rockchip Electronics
     url www.rock-chips.com
     ansi_color 0;34;43
     match_string Rockchip
+
+name Garuda Linux
+    url www.garudalinux.org
+    ansi_color 0;97;45
+    match_string Garuda Linux
 
 name G.Skill International Enterprise
     name_short G.Skill
@@ -429,10 +477,6 @@ name GCT Semiconductor
     match_string GCT Semiconductor
     match_string_case GCT
 
-name Genius
-    url www.genius.ru
-    match_string Genius
-
 name Gigabyte Technology
     name_short Gigabyte
     url www.gigabyte.com.tw
@@ -440,7 +484,6 @@ name Gigabyte Technology
     match_string Giga-byte
     match_string Gigabyte
 
-# NOT Globalsat Group
 name Globalsat Technology
     match_string Globalsat Technology
 
@@ -505,15 +548,6 @@ name Holtek Semiconductor
     ansi_color 0;34;107
     match_string Holtek
 
-name Hoodman Corporation
-    name_short Hoodman
-    url www.hoodmanusa.com
-    ansi_color 0;30;43
-    match_string Hoodman
-
-name HT Micron
-    match_string HT Micron
-
 # JEDEC mfgr [0][64]
 name Infineon Technologies
     name_short infineon
@@ -522,12 +556,6 @@ name Infineon Technologies
     ansi_color 0;34;107
     match_string Infineon
     match_string Infineon (former Siemens)
-
-name Insyde Software
-    name_short Insyde
-    url www.insyde.com
-    ansi_color 0;30;42
-    match_string Insyde
 
 name Intel Corporation
     name_short Intel
@@ -583,6 +611,12 @@ name Koninklijke Philips
     match_string Philips
     note EDID vendor: PHL
     match_string_exact PHL
+
+name Kubuntu
+    name_short Kubuntu
+    url www.kubuntu.org
+    ansi_color 0;97;104
+    match_string_case Kubuntu
 
 name KVM
     url www.linux-kvm.org
@@ -650,10 +684,22 @@ name Linux Foundation
     match_string Linux Foundation
     match_string Linux
 
+name Linux Mint
+    name_short Linux Mint
+    url www.linuxmint.com
+    ansi_color 0;97;42
+    match_string Linux Mint
+
 name LITE-ON
     url www.liteonit.com
     ansi_color 0;97;104
     match_string_case LITE-ON
+
+name LMDE
+    name_short LMDE
+    url www.linuxmint.com
+    ansi_color 0;97;42
+    match_string LMDE
 
 name Logitech International
     name_short logitech
@@ -661,8 +707,8 @@ name Logitech International
     url www.logitech.com
     match_string Logitech
 
-name Longsys (formerly Micron Lexar)
-    name_short longsys/Lexar
+name Lexar
+    name_short Lexar
     url lexar.com
     wikipedia Lexar
     ansi_color 0;31;40
@@ -673,6 +719,12 @@ name Longsys
     url longsys.com
     ansi_color 0;31;107
     match_string Longsys
+
+name Lubuntu
+    name_short Lubuntu
+    ansi_color 0;30;107
+    url www.lubuntu.me
+    match_string Lubuntu
 
 name Magewell
     url www.magewell.com
@@ -697,36 +749,17 @@ name Maxtor
     url www.maxtor.com
     match_string Maxtor
 
-name AO MCST
-    name_short MCST
-    url www.mcst.ru
-    url_support www.mcst.ru/support
+name MX Linux
+    name_short MX Linux
     ansi_color 0;34;107
-    match_string EL2S4
-    match_string MBE1C-PC
-    match_string MONOCUB
-    match_string E8C-SWTX
-    match_string_prefix MBE8C-PC
-    match_string Elbrus-MCST
+    url www.mxlinux.org
+    match_string MX Linux
 
-name AO MCST
-    name_short Information:
-    url www.mcst.ru/elbrus-4c
-    match_string Elbrus-4C
-    url www.mcst.ru/elbrus-1c-plus
-    match_string Elbrus-1C+
-    url www.mcst.ru/elbrus-2c-plus
-    match_string Elbrus-2C+
-    url www.mcst.ru/elbrus-8c
-    match_string Elbrus-8C
-    url www.mcst.ru/elbrus-8sv
-    match_string Elbrus-8CB
-    url www.mcst.ru/elbrus-12c
-    match_string Elbrus-12C
-    url www.mcst.ru/elbrus-16c
-    match_string Elbrus-16C
-    url www.mcst.ru/elbrus-2c3
-    match_string Elbrus-2C3
+name Manjaro Linux
+    name_short Manjaro Linux
+    url www.manjaro.org
+    ansi_color 0;33;40
+    match_string Manjaro Linux
 
 name MediaTek
     url www.mediatek.com
@@ -796,6 +829,18 @@ name NexGen
     note x86 processor vendor ID
     match_string NexGenDriven
 
+name NixOS Linux
+    name_short NixOS Linux
+    ansi_color 0;34;107
+    url nixos.org
+    match_string NixOS Linux
+
+name Nobara Linux
+    name_short Nobara Linux
+    ansi_color 0;34;107
+    url nobaraproject.org
+    match_string Nobara Linux
+
 name nVidia Corporation
     name_short nVidia
     url www.nvidia.com
@@ -815,6 +860,18 @@ name Oculus VR
     wikipedia Oculus VR
     match_string Oculus VR
     match_string Oculus
+
+name OpenMandriva
+    name_short OpenMandriva
+    url www.openmandriva.org
+    ansi_color 0;34;107
+    match_string OpenMandriva
+
+name openSUSE
+    name_short openSUSE
+    url www.opensuse.org
+    ansi_color 0;97;42
+    match_string openSUSE
 
 name Oracle Corporation (formerly InnoTek Systemberatung)
     name_short Oracle (InnoTek)
@@ -838,6 +895,12 @@ name Oracle Corporation
     url www.oracle.com
     ansi_color 0;97;41
     match_string Oracle
+
+name Oracle Linux
+    name_short Oracle Linux
+    url www.oracle.com/linux
+    ansi_color 0;97;41
+    match_string Oracle Linux
 
 name Ours Technology
     url www.oti.com.tw
@@ -864,6 +927,12 @@ name Patriot Memory
     wikipedia Patriot Memory
     ansi_color 0;97;44
     match_string Patriot Memory
+
+name PCLinuxOS
+    name_short PCLinuxOS
+    url www.pclinuxos.com
+    ansi_color 0;97;44
+    match_string PCLinuxOS
 
 name Phison Electronics Corporation
     name_short Phison
@@ -900,6 +969,24 @@ name PNY Technologies
     wikipedia PNY Technologies
     ansi_color 0;97;100
     match_string_case PNY
+
+name Pop!_OS
+    name_short Pop!_OS
+    url pop.system76.com
+    ansi_color 0;97;100
+    match_string_case Pop!_OS
+
+name Puppy Linux
+    name_short Puppy Linux
+    url puppylinux-woof-ce.github.io
+    ansi_color 0;31;107
+    match_string Puppy Linux
+
+name PureOS
+    name_short PureOS
+    ansi_color 0;34;107
+    url www.pureos.net
+    match_string PureOS
 
 name Qualcomm (formerly Atheros)
     name_short Qualcomm (Atheros)
@@ -939,7 +1026,7 @@ name Raspberry Pi Foundation
     match_string Raspberry Pi
 
 name Raspbian
-    url www.raspberrypi.org/downloads/raspbian/
+    url www.raspbian.org
     ansi_color 0;97;101
     match_string raspbian
 
@@ -948,6 +1035,12 @@ name Realtek Semiconductor
     url www.realtek.com.tw
     ansi_color 0;34;107
     match_string Realtek
+
+name RebornOS Linux
+    name_short RebornOS Linux
+    url rebornos.org
+    ansi_color 0;36;107
+    match_string RebornOS Linux
 
 name Red Hat
     url www.redhat.com
@@ -972,6 +1065,12 @@ name Rise Technology
     name_short Rise
     note x86 processor vendor ID
     match_string RiseRiseRise
+
+name Rocky Linux
+    name_short Rocky Linux
+    url www.rockylinux.org
+    ansi_color 0;97;42
+    match_string Rocky Linux
 
 name S3 Graphics
     name_short VIA/S3
@@ -1035,9 +1134,6 @@ name Sharp Corporation
     note EDID vendor: SHP
     match_string_exact SHP
 
-name Siano Mobile Silicon
-    match_string Siano Mobile Silicon
-
 name Siemens AG
     name_short Siemens
     url www.siemens.com
@@ -1075,9 +1171,18 @@ name SK Hynix
     match_string Hyundai
 
 name Slackware
+    name_short Slackware
     url www.slackware.com
     ansi_color 0;30;107
-    match_string Slackware
+    match_string Slackw
+
+#note: Slint can miss matching compared to slackware (longer word)
+name Slint
+    name_short Slint
+    url slint.fr
+    ansi_color 0;30;107
+    match_string_num_prefix Slint 
+#note space above needed at end of Slint
 
 name Socket Mobile
     url www.socketmobile.com
@@ -1128,11 +1233,6 @@ name STMicroelectronics
     match_string STMicroelectronics
     match_string ST Micro
 
-name Suprema
-    url www.supremainc.com
-    ansi_color 0;31;107
-    match_string suprema
-
 name Synaptics (formerly Brooktree)
     name_short Synaptics (Brooktree)
     url www.synaptics.com
@@ -1151,6 +1251,13 @@ name Synopsys
     url www.synopsys.com
     ansi_color 0;35;107
     match_string Synopsys
+
+name System Rescue
+    name_short System Rescue
+    url www.system-rescue.org
+    ansi_color 0;97;44
+    match_string System Rescue
+    match_string SystemRescue
 
 name TDK-Micronas
     url www.micronas.com
@@ -1221,6 +1328,13 @@ name Ubuntu
     ansi_color 0;97;45
     match_string ubuntu
 
+name Ultramarine Linux
+    name_short Ultramarine Linux
+    ansi_color 0;34;107
+    url ultramarine-linux.org
+    match_string Ultramarine Linux
+    match_string Ultramarine
+
 name Union Memory (Shenzhen)
     name_short Union Memory
     url unionmem.com
@@ -1231,14 +1345,6 @@ name United Microelectronics Corporation
     name_short UMC
     note x86 processor vendor ID
     match_string UMC UMC UMC
-
-name Valve Corporation
-    name_short VALVE
-    url valvesoftware.com
-    wikipedia Valve Corporation
-    ansi_color 0;97;41
-    match_string Valve Corporation
-    match_string Valve
 
 name VIA (formerly Centaur Technology)
     name_short VIA (Centaur)
@@ -1293,6 +1399,12 @@ name Vizio
     note EDID vendor: VIZ
     match_string_exact VIZ
 
+name Void Linux
+    name_short Void Linux
+    url www.voidlinux.org
+    ansi_color 0;33;40
+    match_string Void Linux
+
 name VMware
     url www.vmware.com
     wikipedia VMware
@@ -1310,13 +1422,6 @@ name Western Digital
     match_string Western Digital
     match_string_case WDC
     match_string_num_prefix_case WD
-
-# Company defunct, now brand name of Chinese company
-name Westinghouse Electronics
-    name_short W
-    wikipedia Westinghouse Electronics
-    ansi_color 0;97;44
-    match_string Westinghouse
 
 name Winbond Electronics Corporation
     name_short Winbond
@@ -1342,6 +1447,12 @@ name XFX Pine Group
     wikipedia XFX
     ansi_color 0;30;42
     match_string_case XFX
+
+name Xubuntu
+    name_short Xubuntu
+    ansi_color 0;30;107
+    url www.xubuntu.org
+    match_string Xubuntu
 
 name Yamaha Corporation
     name_short Yamaha

@@ -22,10 +22,125 @@
 #include <sys/utsname.h>
 #include "hardinfo.h"
 #include "computer.h"
-#include "distro_flavors.h"
+#include "util_sysobj.h" /* for appfsp() */
 
-static gchar *
-get_libc_version(void)
+//find distro for debian/ubuntu bases
+typedef struct {
+    const char *name;
+    const char *id;
+    const char *aptname;
+    const char *filename;
+    const char *versiontext;
+} AptFlavor;
+
+static const AptFlavor apt_flavors[] = {
+    { "Ubuntu Desktop", "ubuntu",          "ubuntu-desktop",           "/etc/os-release",            "VERSION_ID=" },
+    { "Ubuntu Server",  "ubuntu",          "ubuntu-server",            "/etc/os-release",            "VERSION_ID=" },
+    { "Ubuntu MATE",    "ubuntu-mate",     "ubuntu-mate-desktop",      "/etc/os-release",            "VERSION_ID=" },
+    { "Ubuntu Budgie",  "ubuntu-budgie",   "ubuntu-budgie-desktop",    "/etc/os-release",            "VERSION_ID=" },
+    { "Ubuntu Kylin",   "ubuntu-kylin",    "ubuntukylin-desktop",      "/etc/os-release",            "VERSION_ID=" },
+    { "Ubuntu Studio",  "ubuntu-studio",   "ubuntustudio-desktop",     "/etc/os-release",            "VERSION_ID=" },
+    { "Xubuntu",        "xubuntu",         "xubuntu-desktop",          "/etc/os-release",            "VERSION_ID=" },
+    { "Kubuntu",        "kubuntu",         "kubuntu-desktop",          "/etc/os-release",            "VERSION_ID=" },
+    { "Lubuntu",        "lubuntu",         "lubuntu-desktop",          "/etc/os-release",            "VERSION_ID=" },
+    { "Edubuntu",       "edubuntu",        "edubuntu-desktop",         "/etc/os-release",            "VERSION_ID=" },
+    { "Bodhi Linux",    "bodhi",           "bodhi-appcenter",          "/etc/bodhi/info",            "RELEASE=" },
+    { "MX Linux",       "mxlinux",         "mx-welcome",               "/etc/mx-version",            "MX-" },
+    { "Raspbian",       "raspbian",        "raspbian-archive-keyring", "/etc/os-release",            "VERSION_ID=" },
+    { "Armbian",        "armbian",         "armbian-config",           "/etc/armbian-image-release", "VERSION=" },
+    { "Raspberry Pi",   "raspberry-pi",    "rpi-update",               "/etc/os-release",            "VERSION_ID=" },
+    { "PureOS",         "pureos",          "pureos-settings",          "/etc/os-release",            "VERSION_ID=" },
+    { "Puppy Linux",    "puppy",           "/etc/DISTRO_SPECS",        "/etc/DISTRO_SPECS",          "DISTRO_VERSION=" },
+    { "Ubuntu GNOME",   "ubuntu-gnome",    "ubuntu-gnome-desktop",     "/etc/os-release",            "VERSION_ID=" },//dead
+    { NULL }
+};
+void apt_flavors_scan(gchar **pretty_name, gchar **codename, gchar **id, gchar **orig_id, gchar **orig_name) {
+    gboolean spawned;
+    gchar *out, *err, *p, *next_nl,*st,*version;
+    gchar **split, *contents=NULL, **line;
+    gint exit_status;
+    const AptFlavor *f = NULL;
+    gchar *cmd_line = g_strdup("apt-cache policy");
+    int i = 0, found=0;
+
+    while(apt_flavors[i].name){
+        if(apt_flavors[i].aptname[0]!='/') cmd_line = appfsp(cmd_line, "%s", apt_flavors[i].aptname);
+	if((apt_flavors[i].aptname[0]=='/') && g_file_get_contents(apt_flavors[i].aptname, &contents, NULL, NULL)) {found=1;break;}
+	i++;
+    }
+    if(found){
+        f = &apt_flavors[i];
+	g_free(contents);
+    } else {
+        spawned = hardinfo_spawn_command_line_sync(cmd_line, &out, &err, &exit_status, NULL);
+        if (spawned) {
+            p = out;
+            while((next_nl = strchr(p, '\n'))) {
+                strend(p, '\n');
+                int mc = 0;
+		char pkg[32] = "";
+		if (*p != ' ' && *p != '\t')
+		  mc = sscanf(p, "%31s", pkg);
+		if (mc == 1) {
+		  strend(pkg, ':');
+		  int i=0;
+		  while(apt_flavors[i].name && !SEQ(apt_flavors[i].aptname, pkg)) i++;
+		  if(apt_flavors[i].name) f = &apt_flavors[i]; else f=NULL;
+		} else if(g_strstr_len(p, -1, "Installed:") && !g_strstr_len(p, -1, "(none)") ) {
+		  found=1;
+		  break;
+		}
+		p = next_nl + 1;
+	    }
+	    g_free(out);
+	    g_free(err);
+	}
+    }
+
+    if(found){
+        //find version
+        version=NULL; split=NULL; contents=NULL;
+        if (f && f->filename && (strlen(f->filename)>1) && g_file_get_contents(f->filename, &contents, NULL, NULL)){
+	    split = g_strsplit(contents, "\n", 0);
+	    if (split) for (line = split; *line; line++) {
+		if (!f->versiontext ||
+		    (!strlen(f->versiontext) || !strncmp(*line, f->versiontext, strlen(f->versiontext))) ) {
+		  if(strlen(f->versiontext)==0)
+		      version=g_strdup(contents);
+		  else
+		      version = g_strdup(*line + strlen(f->versiontext));
+		  strend(version,' ');
+		  strend(version,'_');
+		  //clean up version and allow zero length
+		  st=version; version=strreplace(version,"\"",""); g_free(st);
+		  st=version; version=strreplace(version,"\n",""); g_free(st);
+		  if(strlen(version)<1) {g_free(version); version=NULL;}
+		}
+	      }
+	}
+	if(version){
+	    st=*pretty_name; *pretty_name=g_strdup_printf("%s %s - %s", f->name, version, st); g_free(st);
+	} else {
+	    st=*pretty_name; *pretty_name=g_strdup_printf("%s - %s", f->name, st); g_free(st);
+	}
+	//g_free(*codename);*codename=NULL;
+	if(contents) g_free(contents);
+	if(split) g_strfreev(split);
+	g_free(*id);*id=g_strdup(f->id);
+    }
+    //use from os-release if not found and not native debian
+    if(!found && *orig_id && !g_str_equal(*orig_id,"debian")){
+	*id=*orig_id;
+	if(*pretty_name && *orig_name){
+            st=*pretty_name; *pretty_name=g_strdup_printf("%s - %s", *orig_name, st); g_free(st);
+	}
+        if(*orig_name) g_free(*orig_name);
+    }
+    g_free(cmd_line);
+}
+
+
+static gchar *get_libc_version(void)
 {
     static const struct {
         const char *test_cmd;
@@ -101,8 +216,7 @@ static gchar *detect_kde_version(void)
     return tmp ? g_strdup(tmp + strlen("KDE: ")) : NULL;
 }
 
-static gchar *
-detect_gnome_version(void)
+static gchar *detect_gnome_version(void)
 {
     gchar *tmp;
     gchar *out;
@@ -134,8 +248,7 @@ detect_gnome_version(void)
 }
 
 
-static gchar *
-detect_mate_version(void)
+static gchar *detect_mate_version(void)
 {
     gchar *tmp;
     gchar *out;
@@ -155,8 +268,7 @@ detect_mate_version(void)
     return NULL;
 }
 
-static gchar *
-detect_window_manager(void)
+static gchar *detect_window_manager(void)
 {
   const gchar *curdesktop;
   const gchar* windowman;
@@ -198,8 +310,7 @@ desktop_with_session_type(const gchar *desktop_env)
     return g_strdup(desktop_env);
 }
 
-static gchar *
-detect_xdg_environment(const gchar *env_var)
+static gchar *detect_xdg_environment(const gchar *env_var)
 {
     const gchar *tmp;
 
@@ -229,8 +340,7 @@ detect_xdg_environment(const gchar *env_var)
     return g_strdup(tmp);
 }
 
-static gchar *
-detect_desktop_environment(void)
+static gchar *detect_desktop_environment(void)
 {
     const gchar *tmp;
     gchar *windowman;
@@ -267,8 +377,7 @@ detect_desktop_environment(void)
     return g_strdup(_("Unknown"));
 }
 
-gchar *
-computer_get_dmesg_status(void)
+gchar *computer_get_dmesg_status(void)
 {
     gchar *out = NULL, *err = NULL;
     int ex = 1, result = 0;
@@ -290,8 +399,7 @@ computer_get_dmesg_status(void)
     return g_strdup(_("(Unknown)"));
 }
 
-gchar *
-computer_get_aslr(void)
+gchar *computer_get_aslr(void)
 {
     switch (h_sysfs_read_int("/proc/sys/kernel", "randomize_va_space")) {
     case 0:
@@ -305,8 +413,7 @@ computer_get_aslr(void)
     }
 }
 
-gchar *
-computer_get_entropy_avail(void)
+gchar *computer_get_entropy_avail(void)
 {
     gchar tab_entropy_fstr[][32] = {
       N_(/*/bits of entropy for rng (0)*/              "(None or not available)"),
@@ -321,8 +428,7 @@ computer_get_entropy_avail(void)
     return g_strdup_printf(_(tab_entropy_fstr[0]), bits);
 }
 
-gchar *
-computer_get_language(void)
+gchar *computer_get_language(void)
 {
     gchar *tab_lang_env[] =
         { "LANGUAGE", "LANG", "LC_ALL", "LC_MESSAGES", NULL };
@@ -352,32 +458,20 @@ computer_get_language(void)
     return ret;
 }
 
-static Distro
-parse_os_release(void)
+static Distro parse_os_release(void)
 {
     gchar *pretty_name = NULL;
     gchar *id = NULL;
     gchar *version = NULL;
     gchar *codename = NULL;
     gchar **split, *contents, **line;
-    int armbian=0,raspberry=0;
+    gchar *orig_id=NULL, *orig_name=NULL;
 
-    //check for rpi
-    if (g_file_get_contents("/etc/rpi-issue", &contents, NULL, NULL)){
-        raspberry=1;
-        g_free(contents);
-    }
-
-    //armbian overrides the /etc/os-release, which is normally a link
-    if (g_file_get_contents("/etc/armbian-release", &contents, NULL, NULL)){
-        g_free(contents);
+    //some overrides the /etc/os-release, so we use usr/lib first and fixes distro via Apt, OLD DISTRO fallback to /etc/os.
+    if (!g_file_get_contents("/usr/lib/os-release", &contents, NULL, NULL))
         if (!g_file_get_contents("/etc/os-release", &contents, NULL, NULL))
             return (Distro) {};
-	armbian=1;
-    } else {
-        if (!g_file_get_contents("/usr/lib/os-release", &contents, NULL, NULL))
-            return (Distro) {};
-    }
+
 
     split = g_strsplit(contents, "\n", 0);
     g_free(contents);
@@ -385,32 +479,61 @@ parse_os_release(void)
         return (Distro) {};
 
     for (line = split; *line; line++) {
-        if (!strncmp(*line, "ID=", sizeof("ID=") - 1)) {
+        if (!strncmp(*line, "ID=", sizeof("ID=") - 1) && (id == NULL)) {
             id = g_strdup(*line + strlen("ID="));
-        } else if (!strncmp(*line, "VERSION_ID=", sizeof("VERSION_ID=") - 1)) {
+        } else if (!strncmp(*line, "VERSION_ID=", sizeof("VERSION_ID=") - 1) && (version == NULL)) {
             version = g_strdup(*line + strlen("VERSION_ID="));
-	    contents=version;
-	    version = strreplace(version,"\"","");
-	    g_free(contents);
-        } else if (!strncmp(*line, "CODENAME=", sizeof("CODENAME=") - 1) && codename == NULL) {
+        } else if (!strncmp(*line, "CODENAME=", sizeof("CODENAME=") - 1) && (codename == NULL)) {
             codename = g_strdup(*line + strlen("CODENAME="));
-        } else if (!strncmp(*line, "VERSION_CODENAME=", sizeof("VERSION_CODENAME=") - 1) && codename == NULL) {
+        } else if (!strncmp(*line, "VERSION_CODENAME=", sizeof("VERSION_CODENAME=") - 1) && (codename == NULL)) {
             codename = g_strdup(*line + strlen("VERSION_CODENAME="));
-        } else if (!strncmp(*line, "PRETTY_NAME=", sizeof("PRETTY_NAME=") - 1)) {
+        } else if (!strncmp(*line, "PRETTY_NAME=", sizeof("PRETTY_NAME=") - 1) && (pretty_name == NULL)) {
             pretty_name = g_strdup(*line + strlen("PRETTY_NAME="));
-	    contents=pretty_name;
-            pretty_name = strreplace(pretty_name,"\"","");
-	    g_free(contents);
         }
     }
 
     g_strfreev(split);
 
-    //remove " from codename, allow empty codename, remove newline
+    //remove ",/n,allow empty
+    if(pretty_name){
+	contents=pretty_name;
+        pretty_name=strreplace(pretty_name,"\"","");
+        g_free(contents);
+	//
+	contents=pretty_name;
+        pretty_name=strreplace(pretty_name,"\n","");
+        g_free(contents);
+        if(strlen(pretty_name)<1) {g_free(pretty_name);pretty_name=NULL;}
+    }
     if(codename){
+	contents=codename;
+        codename=strreplace(codename,"\"","");
+        g_free(contents);
+	//
+	contents=codename;
         codename=strreplace(codename,"\n","");
-        if(strlen(codename)>=2 && codename[0]=='"') codename=strreplace(codename,"\"","");
+        g_free(contents);
         if(strlen(codename)<1) {g_free(codename);codename=NULL;}
+    }
+    if(id){
+	contents=id;
+        id=strreplace(id,"\"","");
+        g_free(contents);
+	//
+	contents=id;
+        id=strreplace(id,"\n","");
+        g_free(contents);
+        if(strlen(id)<1) {g_free(id);id=NULL;}
+    }
+    if(version){
+	contents=version;
+        version=strreplace(version,"\"","");
+        g_free(contents);
+	//
+	contents=version;
+        version=strreplace(version,"\n","");
+        g_free(contents);
+        if(strlen(version)<1) {g_free(version);version=NULL;}
     }
 
     //remove codename from pretty name
@@ -428,26 +551,66 @@ parse_os_release(void)
 	g_strstrip(pretty_name);
     }
 
-    //read debian version & flavour it
-    if (pretty_name && version && g_str_equal(id, "debian")) {
-        if (g_file_get_contents("/etc/debian_version", &contents, NULL, NULL)){
-            if (isdigit(contents[0])){
-	        if(raspberry){
-		    gchar *t=pretty_name;
-		    pretty_name=g_strdup_printf("Raspberry Pi - Debian %s",contents);
-		    g_free(t);
-	        } else if(armbian){
-		    gchar *t=pretty_name;
-		    pretty_name=g_strdup_printf("%s - Debian %s",t,contents);
-		    g_free(t);
-		} else {
-		    gchar *t=pretty_name;
-	            pretty_name=strreplace(t,version,contents);
-		    g_free(t);
-		}
-            }
-            g_free(contents);
-        }
+    //Based on Fedora Linux add to distro string
+    if(pretty_name && !g_str_equal(id, "fedora")  && g_file_get_contents("/etc/fedora-release", &contents , NULL, NULL) ) {
+        gchar *t,*p=contents;
+        while(*p && ((*p>'9') || (*p<'0'))) p++;
+        if(p) strend(p,' '); else p="";
+        t=pretty_name; pretty_name=g_strdup_printf("%s - Fedora %s", t,p); g_free(t);
+        g_free(contents);
+    } else
+    //Based on RedHat Linux add to distro string
+    if(pretty_name && !g_str_equal(id, "rhel") && !g_str_equal(id, "fedora") && g_file_get_contents("/etc/redhat-release", &contents , NULL, NULL) ) {
+        gchar *t,*p=contents;
+        while(*p && ((*p>'9') || (*p<'0'))) p++;
+        if(p) strend(p,' '); else p="";
+	//FIXME: Add table RHEL->Fedora
+	//RHEL4=>FC3
+	//RHEL5=>FC6
+	//RHEL6=>FC12+
+	//RHEL7=>FC19+
+	//RHEL8=>FC28
+	//RHEL9=>FC34
+	//RHEL10=>FC40
+	if(g_str_equal(id,"openmandriva")) {/*Mandriva is not based on redhat/fedora anymore - was based on RH5.1*/}
+	else if(atoi(p)>=19){//hmm, distro should have had fedora-release
+            t=pretty_name; pretty_name=g_strdup_printf("%s - Fedora %s", t,p); g_free(t);
+	} else {
+            t=pretty_name; pretty_name=g_strdup_printf("%s - RHEL %s", t,p); g_free(t);
+	}
+        g_free(contents);
+    }
+    //Based on Arch Linux add to distro string
+    if(pretty_name && !g_str_equal(id, "arch") && g_file_get_contents("/etc/arch-release", &contents , NULL, NULL) ) {
+       gchar *t;
+       t=pretty_name; pretty_name=g_strdup_printf("%s - Arch Linux", t); g_free(t);
+       g_free(contents);
+    }
+    //Based on Slackware add to distro string
+    if(pretty_name && !g_str_equal(id, "slackware") && g_file_get_contents("/etc/slackware-version", &contents , NULL, NULL) ) {
+       gchar *t;
+       t=pretty_name; pretty_name=g_strdup_printf("%s - Slackware", t); g_free(t);
+       g_free(contents);
+    }
+    //Based on debian add to distro string
+    if(pretty_name && id && (g_file_get_contents("/etc/debian_version", &contents , NULL, NULL) || g_str_equal(id,"debian")) ) {
+       orig_id=id;
+       id=g_strdup("debian");
+       orig_name=pretty_name;
+       //debian version check
+       if (!contents || isdigit(contents[0]) || contents[0] != 'D') {
+	   if(contents)
+              pretty_name=g_strdup_printf("Debian GNU/Linux %s", contents);
+           else
+              pretty_name=g_strdup_printf("Debian GNU/Linux");
+       } else {
+           pretty_name=g_strdup(contents);
+       }
+       g_free(contents);
+    }
+    //use APT to find distro
+    if (pretty_name && (g_str_equal(id, "debian") ||g_str_equal(id, "ubuntu")) ) {
+      apt_flavors_scan(&pretty_name,&codename,&id,&orig_id,&orig_name);
     }
 
     if (pretty_name){
@@ -455,90 +618,102 @@ parse_os_release(void)
         return (Distro) { .distro = pretty_name, .codename = codename, .id = id };
     }
 
+    g_free(pretty_name);
     g_free(id);
+    g_free(version);
+    g_free(codename);
     return (Distro) {};
 }
 
 
-static Distro
-detect_distro(void)
+static Distro detect_distro(void)
 {
     static const struct {
         const gchar *file;
         const gchar *id;
         const gchar *override;
+        const gchar *versiontext;
     } distro_db[] = {
 #define DB_PREFIX "/etc/"
-        { DB_PREFIX "arch-release", "arch", "Arch Linux" },
-        { DB_PREFIX "fatdog-version", "fatdog" },
-        { DB_PREFIX "debian_version", "debian" },
-        { DB_PREFIX "slackware-version", "slk" },
-        { DB_PREFIX "mandrake-release", "mdk" },
-        { DB_PREFIX "mandriva-release", "mdv" },
-        { DB_PREFIX "fedora-release", "fedora" },
-        { DB_PREFIX "coas", "coas" },
-        { DB_PREFIX "environment.corel", "corel"},
-        { DB_PREFIX "gentoo-release", "gnt" },
-        { DB_PREFIX "conectiva-release", "cnc" },
-        { DB_PREFIX "versão-conectiva", "cnc" },
-        { DB_PREFIX "turbolinux-release", "tl" },
-        { DB_PREFIX "yellowdog-release", "yd" },
-        { DB_PREFIX "sabayon-release", "sbn" },
-        { DB_PREFIX "enlisy-release", "enlsy" },
-        { DB_PREFIX "SuSE-release", "suse" },
-        { DB_PREFIX "sun-release", "sun" },
-        { DB_PREFIX "zenwalk-version", "zen" },
-        { DB_PREFIX "DISTRO_SPECS", "ppy", "Puppy Linux" },
-        { DB_PREFIX "puppyversion", "ppy", "Puppy Linux" },
-        { DB_PREFIX "distro-release", "fl" },
-        { DB_PREFIX "vine-release", "vine" },
+//This table is fallback to check files instead of os-release file and apt (OLD DISTROS)
+        { DB_PREFIX "arch-release",        "arch",    "Arch Linux" ,      NULL },
+        { DB_PREFIX "fatdog-version",      "fatdog",  NULL,               "" },
+	{ DB_PREFIX "debian_version",      "debian",  "Debian GNU/Linux", "" },
+        { DB_PREFIX "slackware-version",   "slk" },
+        { DB_PREFIX "mandrake-release",    "mdk" },
+        { DB_PREFIX "mandriva-release",    "mdv" },
+        { DB_PREFIX "fedora-release",      "fedora" },
+        { DB_PREFIX "coas",                "coas" },
+        { DB_PREFIX "environment.corel",   "corel" },
+        { DB_PREFIX "gentoo-release",      "gnt" },
+        { DB_PREFIX "conectiva-release",   "cnc" },
+        { DB_PREFIX "versão-conectiva",    "cnc" },
+        { DB_PREFIX "turbolinux-release",  "tl" },
+        { DB_PREFIX "yellowdog-release",   "yd" },
+        { DB_PREFIX "sabayon-release",     "sbn" },
+        { DB_PREFIX "enlisy-release",      "enlsy" },
+        { DB_PREFIX "SuSE-release",        "suse" },
+        { DB_PREFIX "sun-release",         "sun" },
+        { DB_PREFIX "zenwalk-version",     "zen" },
+        { DB_PREFIX "DISTRO_SPECS",        "puppy",    "Puppy Linux",     "DISTRO_VERSION=" },
+        { DB_PREFIX "distro-release",      "fl" },
+        { DB_PREFIX "vine-release",        "vine" },
         { DB_PREFIX "PartedMagic-version", "pmag" },
-        { DB_PREFIX "NIXOS", "nixos", "NixOS Linux" },
-         /*
-         * RedHat must be the *last* one to be checked, since
-         * some distros (like Mandrake) includes a redhat-relase
-         * file too.
-         */
-        { DB_PREFIX "redhat-release", "rh" },
+        { DB_PREFIX "NIXOS",               "nixos",    "NixOS Linux",     NULL },
+        { DB_PREFIX "redhat-release",      "redhat" },
 #undef DB_PREFIX
         { NULL, NULL }
     };
     Distro distro;
-    gchar *contents;
+    gchar *contents,*t;
     int i;
+    gchar *version=NULL, **split, **line, *st;
 
     distro = parse_os_release();
-    if (distro.distro)
-        return distro;
+    if (distro.distro) return distro;
 
+    //if not found via os-release then find distro via files
     for (i = 0; distro_db[i].file; i++) {
         if (!g_file_get_contents(distro_db[i].file, &contents, NULL, NULL))
             continue;
 
+	distro.distro=g_strdup(contents);
+	distro.id = g_strdup(distro_db[i].id);
+
+	//override distro name
         if (distro_db[i].override) {
-            g_free(contents);
-            return (Distro) { .distro = g_strdup(distro_db[i].override),
-                              .id = g_strdup(distro_db[i].id) };
+	    g_free(distro.distro);
+	    distro.distro = g_strdup(distro_db[i].override);
         }
 
-        if (g_str_equal(distro_db[i].id, "debian")) {
-            /* HACK: Some Debian systems doesn't include the distribuition
-             * name in /etc/debian_release, so add them here. */
-            if (isdigit(contents[0]) || contents[0] != 'D')
-                return (Distro) {
-                    .distro = g_strdup_printf("Debian GNU/Linux %s", (char*)idle_free(contents)),
-                    .id = g_strdup(distro_db[i].id)
-                };
-        }
-
-        if (g_str_equal(distro_db[i].id, "fatdog")) {
-            return (Distro) {
-                .distro = g_strdup_printf("Fatdog64 [%.10s]", (char*)idle_free(contents)),
-                .id = g_strdup(distro_db[i].id)
-            };
-        }
-
-        return (Distro) { .distro = contents, .id = g_strdup(distro_db[i].id) };
+	//Add version
+        if (distro.distro && distro_db[i].versiontext) {
+	    //find version
+            split = g_strsplit(contents, "\n", 0);
+            if (split) for (line = split; *line; line++) {
+                if (!distro_db[i].versiontext ||
+		  (!strlen(distro_db[i].versiontext) || !strncmp(*line, distro_db[i].versiontext, strlen(distro_db[i].versiontext)))) {
+		    if(strlen(distro_db[i].versiontext)==0)
+		        version=g_strdup(contents);
+		    else
+		        version = g_strdup(*line + strlen(distro_db[i].versiontext));
+	            strend(version,' ');
+	            strend(version,'_');
+	            //clean up version and allow zero length
+	            st=version; version=strreplace(version,"\"",""); g_free(st);
+	            st=version; version=strreplace(version,"\n",""); g_free(st);
+	            if(strlen(version)<1) {g_free(version);version=NULL;}
+	        }
+	    }
+            //add version
+	    if(version){
+	       t=distro.distro;
+               distro.distro = g_strdup_printf("%s %s", t, contents),
+	       g_free(t);
+	    }
+	}
+        g_free(contents);
+        return distro;
     }
 
     return (Distro) { .distro = g_strdup(_("Unknown")) };
@@ -576,15 +751,6 @@ computer_get_os(void)
         os->desktop = desktop_with_session_type(idle_free(os->desktop));
 
     os->entropy_avail = computer_get_entropy_avail();
-
-    if (g_strcmp0(os->distroid, "ubuntu") == 0) {
-        GSList *flavs = ubuntu_flavors_scan();
-        if (flavs) {
-            /* just use the first one */
-            os->distro_flavor = (DistroFlavor*)flavs->data;
-        }
-        g_slist_free(flavs);
-    }
 
     return os;
 }

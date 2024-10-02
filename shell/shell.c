@@ -368,7 +368,7 @@ static void stylechange2_me(void)
     gint darkmode=0;
     if((color.red+color.green+color.blue)<=1.5) darkmode=1;
     //
-    if(schemeDark & !darkmode) {
+    if(schemeDark && (!darkmode) ) {
         if(newgnome){
             darkmode=1;
             //g_print("We need to change GTK_THEME to dark\n");
@@ -378,7 +378,7 @@ static void stylechange2_me(void)
 	    changed2dark=1;
 	}
     }
-    if(!schemeDark & darkmode & changed2dark) {
+    if( (!schemeDark) && darkmode && changed2dark ) {
         if(newgnome){
 	    darkmode=0;
             //g_print("We need to change GTK_THEME to light\n");
@@ -405,35 +405,31 @@ static void stylechange3_me(void)
 {
     gchar *theme=NULL;
     int newDark=0,i=0;
-    gchar **keys;
-    if(!newgnome) keys=g_settings_list_keys(settings);
-    while(!newgnome && (keys[i]!=NULL)){
+    gchar **keys=NULL;
+    if(settings && !newgnome) keys=g_settings_list_keys(settings);
+    while(!newgnome && keys && (keys[i]!=NULL)){
         if(strcmp(keys[i],"color-scheme")==0) newgnome=1;
 	g_free(keys[i]);
         i++;
     }
-    //check Adwaita as new gnome uses it
-    theme = g_settings_get_string(settings, "gtk-theme");
-    if(!strstr(theme,"Adwaita")) newgnome=0;
+    //check Adwaita as new gnome uses it - but new mate/budgie does not
+    //theme = g_settings_get_string(settings, "gtk-theme");
+    //if(!strstr(theme,"Adwaita")) newgnome=0;
 
     //new gnome using only normal/dark mode
-    if(newgnome){
-       theme = g_settings_get_string(settings, "color-scheme");
-       if(strstr(theme,"Dark")||strstr(theme,"dark")) {
-	   newDark=1;
-       }
-    } else {//older gnome using themes with dark in theme-name
-       theme = g_settings_get_string(settings, "gtk-theme");//normal
-       if(strstr(theme,"Dark")||strstr(theme,"dark")) {
-           newDark=1;
-       }
-       g_free(theme);
-       theme = g_settings_get_string(settings, "icon-theme");//alternative
-       if(strstr(theme,"Dark")||strstr(theme,"dark")) {
-           newDark=1;
-       }
+    if(settings){
+        if(newgnome){
+            theme = g_settings_get_string(settings, "color-scheme");
+            if(strstr(theme,"Dark")||strstr(theme,"dark")) newDark=1;
+        } else {//older gnome using themes with dark in theme-name
+            theme = g_settings_get_string(settings, "gtk-theme");//normal
+            if(strstr(theme,"Dark")||strstr(theme,"dark")) newDark=1;
+            g_free(theme);
+            theme = g_settings_get_string(settings, "icon-theme");//alternative
+            if(strstr(theme,"Dark")||strstr(theme,"dark")) newDark=1;
+        }
+        g_free(theme);
     }
-    g_free(theme);
     //
     if(newDark){
       if(schemeDark!=1) if(!update) update=1;
@@ -530,13 +526,6 @@ void shell_set_title(Shell *shell, gchar *subtitle)
 static void create_window(void)
 {
     GtkWidget *vbox, *hbox;
-    char theme_st[200];
-#if GTK_CHECK_VERSION(3, 20, 0)
-    GtkCssProvider *provider;
-    provider = gtk_css_provider_new();
-    GtkCssProvider *provider2;
-    provider2 = gtk_css_provider_new();
-#endif
 
     shell = g_new0(Shell, 1);
 
@@ -550,8 +539,9 @@ static void create_window(void)
     g_signal_connect(G_OBJECT(shell->window), "style-updated", stylechange_me, NULL);
     g_signal_connect_after(G_OBJECT(shell->window), "draw", stylechange2_me, NULL);
     update=-1;
-    settings=g_settings_new("org.gnome.desktop.interface");
-    g_signal_connect_after(settings,"changed",stylechange3_me,NULL);
+    if(g_settings_schema_source_lookup(g_settings_schema_source_get_default(),"org.gnome.desktop.interface",FALSE))
+        settings=g_settings_new("org.gnome.desktop.interface");
+    if(settings) g_signal_connect_after(settings,"changed",stylechange3_me,NULL);
     stylechange3_me();
     update=0;
 #endif
@@ -634,7 +624,7 @@ static void create_window(void)
 
     g_free(conf_path);
     g_key_file_free(key_file);
-#if GTK_CHECK_VERSION(3, 20, 0)
+#if GTK_CHECK_VERSION(3, 0, 0)
     if(params.theme==-1) shell_action_set_active("DisableThemeAction", TRUE);
     if(params.theme==1) shell_action_set_active("Theme1Action", TRUE);
     if(params.theme==2) shell_action_set_active("Theme2Action", TRUE);
@@ -664,14 +654,14 @@ static void menu_item_set_icon_always_visible(Shell *shell,
                                               gchar *parent_path,
                                               gchar *item_id)
 {
-    GtkWidget *menuitem;
-    gchar *path;
+    //GtkWidget *menuitem;
+    //gchar *path;
 
-    path = g_strdup_printf("%s/%s", parent_path, item_id);
-    menuitem = gtk_ui_manager_get_widget(shell->ui_manager, path);
+    //path = g_strdup_printf("%s/%s", parent_path, item_id);
+    //menuitem = gtk_ui_manager_get_widget(shell->ui_manager, path);
 
     //gtk_image_menu_item_set_always_show_image(GTK_IMAGE_MENU_ITEM(menuitem), TRUE);
-    g_free(path);
+    //g_free(path);
 }
 
 
@@ -680,7 +670,7 @@ add_module_entry_to_view_menu(gchar * module, gchar * name,
 			      GdkPixbuf * pixbuf, GtkTreeIter * iter)
 {
     GtkAction *action;
-    GtkWidget *menuitem;
+    //GtkWidget *menuitem;
     gint merge_id;
     gchar *path;
     GtkActionEntry entry = {
@@ -883,7 +873,7 @@ void shell_init(GSList * modules)
     shell_action_set_property("ReportAction", "is-important", TRUE);
     shell_action_set_property("SyncManagerAction", "is-important", TRUE);
 
-#if GTK_CHECK_VERSION(3, 20, 0)
+#if GTK_CHECK_VERSION(3, 0, 0)
     shell_action_set_property("DisableThemeAction", "draw-as-radio", TRUE);
     shell_action_set_property("Theme1Action", "draw-as-radio", TRUE);
     shell_action_set_property("Theme2Action", "draw-as-radio", TRUE);
@@ -1015,8 +1005,8 @@ static gboolean update_field(gpointer data)
 }
 
 #if GTK_CHECK_VERSION(3, 0, 0)
-  #define RANGE_SET_VALUE(tree,scrollbar,value) gtk_range_set_value(GTK_RANGE(gtk_scrolled_window_get_##scrollbar(GTK_SCROLLED_WINDOW(shell->tree->scroll))), value)
-  #define RANGE_GET_VALUE(tree,scrollbar) gtk_range_get_value(GTK_RANGE(gtk_scrolled_window_get_##scrollbar(GTK_SCROLLED_WINDOW(shell->tree->scroll))))
+    #define RANGE_SET_VALUE(tree,scrollbar,value) {while (gtk_events_pending()) gtk_main_iteration();gtk_range_set_value(GTK_RANGE(gtk_scrolled_window_get_##scrollbar(GTK_SCROLLED_WINDOW(shell->tree->scroll))), value);}
+    #define RANGE_GET_VALUE(tree,scrollbar) gtk_range_get_value(GTK_RANGE(gtk_scrolled_window_get_##scrollbar(GTK_SCROLLED_WINDOW(shell->tree->scroll))))
 #else
   #define RANGE_SET_VALUE(tree, scrollbar, value)			       \
     do {                                                                       \
@@ -1049,7 +1039,7 @@ static gboolean reload_section(gpointer data)
 {
     ShellModuleEntry *entry = (ShellModuleEntry *)data;
 #if GTK_CHECK_VERSION(2, 14, 0)
-    GdkWindow *gdk_window = gtk_widget_get_window(GTK_WIDGET(shell->window));
+    //GdkWindow *gdk_window = gtk_widget_get_window(GTK_WIDGET(shell->window));
 #endif
 
     /* if the entry is still selected, update it */
@@ -1351,7 +1341,13 @@ static void group_handle_special(GKeyFile *key_file,
 
             if (item) {
                 gchar *file = g_key_file_get_value(key_file, group, key, NULL);
-                GdkPixbuf *pixbuf = icon_cache_get_pixbuf_at_size(file, 22, 22);
+		GdkPixbuf *pixbuf;
+		if(strstr(file,"LARGE")==file){
+		    file=strreplace(file,"LARGE","");
+                     pixbuf = icon_cache_get_pixbuf_at_size(file, -1, 33);
+		} else {
+                     pixbuf = icon_cache_get_pixbuf_at_size(file, 22, 22);
+		}
 
                 g_free(file);
 
@@ -1576,7 +1572,7 @@ void shell_clear_field_updates(void)
     }
 }
 
-static gboolean
+/*static gboolean
 select_first_item(gpointer data)
 {
     GtkTreeIter first;
@@ -1585,7 +1581,7 @@ select_first_item(gpointer data)
         gtk_tree_selection_select_iter(shell->info_tree->selection, &first);
 
     return FALSE;
-}
+}*/
 
 static gboolean select_marked_or_first_item(gpointer data)
 {
@@ -1596,11 +1592,16 @@ static gboolean select_marked_or_first_item(gpointer data)
     if (gtk_tree_model_get_iter_first(shell->info_tree->model, &first)) {
         it = first;
         while (gtk_tree_model_iter_next(shell->info_tree->model, &it)) {
-            gtk_tree_model_get(shell->info_tree->model, &it, INFO_TREE_COL_DATA,
-                               &datacol, -1);
+            gtk_tree_model_get(shell->info_tree->model, &it, INFO_TREE_COL_DATA, &datacol, -1);
+
             if (key_is_highlighted(datacol)) {
-                gtk_tree_selection_select_iter(shell->info_tree->selection,
-                                               &it);
+                gtk_tree_selection_select_iter(shell->info_tree->selection, &it);
+
+		//scoll to selected this machine benchmark
+		GtkTreePath *path=gtk_tree_model_get_path(shell->info_tree->model, &it);
+	        gtk_tree_view_scroll_to_cell (GTK_TREE_VIEW(shell->info_tree->view), path, NULL, TRUE, 0.5, 0.0);
+		gtk_tree_path_free(path);
+
                 found_selection = TRUE;
             }
             g_free(datacol);
@@ -1617,7 +1618,7 @@ static void module_selected_show_info_list(GKeyFile *key_file,
                                            gchar **groups,
                                            gsize ngroups)
 {
-#if GTK_CHECK_VERSION(3, 20, 0)
+#if GTK_CHECK_VERSION(3, 0, 0)
     GtkCssProvider *provider;
     provider = gtk_css_provider_new();
 #endif
@@ -1631,7 +1632,7 @@ static void module_selected_show_info_list(GKeyFile *key_file,
 
     gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(shell->info_tree->view), FALSE);
 
-#if GTK_CHECK_VERSION(3, 20, 0)
+#if GTK_CHECK_VERSION(3, 0, 0)
     if(params.theme>0){
       if(params.darkmode){
         gtk_css_provider_load_from_data(provider, "treeview { background-color: rgba(0xa0, 0xa0, 0xa0, 0.1); } treeview:selected { background-color: rgba(0x60, 0x80, 0xff, 1); } ", -1, NULL);
@@ -1837,7 +1838,7 @@ static void module_selected_show_info_detail(GKeyFile *key_file,
 static void
 module_selected_show_info(ShellModuleEntry *entry, gboolean reload)
 {
-    GdkWindow *gdk_window = gtk_widget_get_window(GTK_WIDGET(shell->info_tree->view));
+    //GdkWindow *gdk_window = gtk_widget_get_window(GTK_WIDGET(shell->info_tree->view));
     gsize ngroups;
     gint i;
 
@@ -1877,6 +1878,8 @@ module_selected_show_info(ShellModuleEntry *entry, gboolean reload)
     case SHELL_VIEW_PROGRESS:
         update_progress();
         break;
+    default:
+        break;
     }
 
     if (!reload) {
@@ -1885,6 +1888,8 @@ module_selected_show_info(ShellModuleEntry *entry, gboolean reload)
         case SHELL_VIEW_LOAD_GRAPH:
         case SHELL_VIEW_PROGRESS_DUAL:
             g_idle_add(select_marked_or_first_item, NULL);
+        default:
+            break;
         }
     }
     shell_set_note_from_entry(entry);
@@ -1964,12 +1969,15 @@ static void detail_view_add_item(DetailView *detail_view,
                                  gchar *name,
                                  gchar *value)
 {
+#if GTK_CHECK_VERSION(3, 0, 0)
+#else
+    GtkWidget *alignment;
+#endif
     GtkWidget *frame;
     GtkWidget *frame_label_box;
     GtkWidget *frame_image;
     GtkWidget *frame_label;
     GtkWidget *content;
-    GtkWidget *alignment;
     gchar *temp;
 
     temp = detail_view_clear_value(value);
@@ -1990,7 +1998,6 @@ static void detail_view_add_item(DetailView *detail_view,
     gtk_box_pack_start(GTK_BOX(frame_label_box), frame_label, FALSE, FALSE, 0);
 
     content = gtk_label_new(temp);
-    /* TODO:GTK3 gtk_alignment_new(), etc is deprecated from 3.14 */
 #if GTK_CHECK_VERSION(3, 0, 0)
     GtkWidget *frame_box;
     frame_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
@@ -2012,8 +2019,7 @@ static void detail_view_add_item(DetailView *detail_view,
     gtk_frame_set_label_widget(GTK_FRAME(frame), frame_label_box);
 
     /* pack the item on the detail_view screen */
-    gtk_box_pack_start(GTK_BOX(shell->detail_view->view), frame, FALSE, FALSE,
-                       4);
+    gtk_box_pack_start(GTK_BOX(shell->detail_view->view), frame, FALSE, FALSE, 4);
 
     g_free(temp);
 }
@@ -2099,7 +2105,6 @@ static void module_selected(gpointer data)
     ShellModuleEntry *entry;
     static ShellModuleEntry *current = NULL;
     static gboolean updating = FALSE;
-    GtkScrollbar *hscrollbar, *vscrollbar;
 
     /* Gets the currently selected item on the left-side TreeView; if there is
        no selection, silently return */
@@ -2139,7 +2144,11 @@ static void module_selected(gpointer data)
 
         gtk_tree_view_columns_autosize(GTK_TREE_VIEW(shell->info_tree->view));
 
-        RANGE_SET_VALUE(info_tree, vscrollbar, 0.0);
+	if(entry->flags & MODULE_FLAG_BENCHMARK) {
+	    //allow to scroll to selected THIS-Machine
+	} else {
+            RANGE_SET_VALUE(info_tree, vscrollbar, 0.0);
+	}
         RANGE_SET_VALUE(info_tree, hscrollbar, 0.0);
         RANGE_SET_VALUE(detail_view, vscrollbar, 0.0);
         RANGE_SET_VALUE(detail_view, hscrollbar, 0.0);
@@ -2220,18 +2229,6 @@ static ShellInfoTree *info_tree_new(void)
 
     gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(treeview), FALSE);
     gtk_tree_view_set_headers_clickable(GTK_TREE_VIEW(treeview), TRUE);
-
-/*#if GTK_CHECK_VERSION(3, 20, 0)
-    if(params.theme>0){
-       //GdkRGBA info_default_text_color       = { .red = 0.2, .green = 0.3, .blue = 1.0, .alpha = 1.0 };
-       //gtk_widget_override_color(treeview, GTK_STATE_FLAG_SELECTED, &info_default_text_color);
-    }
-#else
-    if(params.theme>0){
-       //GdkColor info_default_text_color       = { 0, 0x4fff, 0x6fff, 0xffff };
-       //gtk_widget_modify_fg(treeview, GTK_STATE_SELECTED, &info_default_text_color);
-    }
-#endif*/
 
     info->col_progress = column = gtk_tree_view_column_new();
     gtk_tree_view_column_set_visible(column, FALSE);
@@ -2315,7 +2312,7 @@ static ShellTree *tree_new()
     GtkCellRenderer *cr_text, *cr_pbuf;
     GtkTreeViewColumn *column;
     GtkTreeSelection *sel;
-#if GTK_CHECK_VERSION(3, 20, 0)
+#if GTK_CHECK_VERSION(3, 0, 0)
     GtkCssProvider *provider;
     provider = gtk_css_provider_new();
 #endif
@@ -2341,18 +2338,6 @@ static ShellTree *tree_new()
     gtk_tree_view_set_level_indentation(GTK_TREE_VIEW(treeview), 24);
 #endif
 
-/*#if GTK_CHECK_VERSION(3, 20, 0)
-    if(params.theme>0){
-        GdkRGBA info_default_text_color       = { .red = 0.2, .green = 0.3, .blue = 1.0, .alpha = 1.0 };
-        gtk_widget_override_color(treeview, GTK_STATE_FLAG_SELECTED, &info_default_text_color);
-    }
-#else
-    if(params.theme>0){
-        GdkColor info_default_text_color       = { 0, 0x4fff, 0x6fff, 0xffff };
-        gtk_widget_modify_fg(treeview, GTK_STATE_SELECTED, &info_default_text_color);
-    }
-#endif*/
-
     column = gtk_tree_view_column_new();
     gtk_tree_view_append_column(GTK_TREE_VIEW(treeview), column);
 
@@ -2372,7 +2357,7 @@ static ShellTree *tree_new()
 
     gtk_container_add(GTK_CONTAINER(scroll), treeview);
 
-#if GTK_CHECK_VERSION(3, 20, 0)
+#if GTK_CHECK_VERSION(3, 0, 0)
     if(params.theme>0){
         gtk_css_provider_load_from_data(provider, "treeview { background-color: rgba(0x60, 0x60, 0x60, 0.1); } treeview:selected { background-color: rgba(0x40, 0x60, 0xff, 1); } ", -1, NULL);
         gtk_style_context_add_provider(gtk_widget_get_style_context(treeview), GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);

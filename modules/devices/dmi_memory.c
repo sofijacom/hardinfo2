@@ -1,5 +1,5 @@
 /*
- *    HardInfo - Displays System Information
+ *    HardInfo2 - System information and benchmark
  *    Copyright (C) 2003-2019 L. A. F. Pereira <l@tia.mat.br>
  *    Copyright (C) 2019 Burt P. <pburt0@gmail.com>
  *
@@ -24,18 +24,13 @@
 #include "devices.h"
 #include "vendor.h"
 #include <inttypes.h>
+#include "spd-decode.h"
+#include "util_sysobj.h" /* for appfsp() */
 
 extern const char *dtree_mem_str; /* in devicetree.c */
 
 /* in monitors.c */
 gchar **get_output_lines(const char *cmd_line);
-
-#include "util_sysobj.h" /* for appfsp() */
-#define dmi_spd_msg(...)  /* fprintf (stderr, __VA_ARGS__) */
-
-typedef uint64_t dmi_mem_size;
-
-#include "spd-decode.c"
 
 gboolean no_handles = FALSE;
 gboolean sketchy_info = FALSE;
@@ -53,31 +48,20 @@ static const char mem_icon[] = "memory.png";
 static const char array_icon[] = "devices.png";
 static const char empty_icon[] = "module.png";
 
-#define UNKNOWN_MEM_TYPE_STRING _("RAM")
-#define UNKIFNULL2(f) ((f) ? f : _("(Unknown)"))
-#define UNKIFEMPTY2(f) ((*f) ? f : _("(Unknown)"))
-#define STR_IGNORE(str, ignore) if (SEQ(str, ignore)) { *str = 0; null_if_empty(&str); }
 
 dmi_mem_size dmi_read_memory_str_to_MiB(const char *memstr) {
     dmi_mem_size ret = 0, v = 0;
     char l[7] = "";
-    /* dmidecode units: "bytes", "kB", "MB", "GB", "TB", "PB", "EB", "ZB" */
-    int mc = sscanf(memstr, "%"PRId64" %6s", &v, l);
+    /* dmidecode units: "bytes", "kB", "MB", "GB", "TB" */
+    int mc = sscanf(memstr, "%u %6s", &v, l);
     if (mc == 2) {
-        if (SEQ(l, "ZB")) ret = v * 1024 * 1024 * 1024 * 1024 * 1024;
-        else if (SEQ(l, "EB")) ret = v * 1024 * 1024 * 1024 * 1024;
-        else if (SEQ(l, "PB")) ret = v * 1024 * 1024 * 1024;
-        else if (SEQ(l, "TB")) ret = v * 1024 * 1024;
+        if (SEQ(l, "TB")) ret = v * 1024 * 1024;
         else if (SEQ(l, "GB")) ret = v * 1024;
         else if (SEQ(l, "MB")) ret = v;
         else if (SEQ(l, "kB")) {
-            /* should never appear */
-            if (v % 1024) { dmi_spd_msg("OMG kB!"); }
             ret = v / 1024;
         }
         else if (SEQ(l, "bytes")) {
-            /* should never appear */
-            if (v % 1024) { dmi_spd_msg("OMG bytes!"); }
             ret = v / (1024 * 1024);
         }
     }
@@ -307,11 +291,12 @@ dmi_mem_socket *dmi_mem_socket_new(dmi_handle h) {
             }
         }
 
+        /*FIXME: Move to SPD
         if (s->mfgr && !s->has_jedec_mfg_id && strlen(s->mfgr) == 4) {
-            /* Some BIOS put the code bytes into the mfgr string
-             * if they don't know the manufacturer.
-             * It's not always reliable, but what is lost
-             * by trying it? */
+            //Some BIOS put the code bytes into the mfgr string
+            // if they don't know the manufacturer.
+            // It's not always reliable, but what is lost
+            // by trying it?
             if (isxdigit(s->mfgr[0])
                 && isxdigit(s->mfgr[1])
                 && isxdigit(s->mfgr[2])
@@ -326,7 +311,7 @@ dmi_mem_socket *dmi_mem_socket_new(dmi_handle h) {
                     if (mstr)
                         s->mfgr = g_strdup(mstr);
                 }
-        }
+        }*/
 
         s->vendor = vendor_match(s->mfgr, NULL);
     }
@@ -608,74 +593,6 @@ void dmi_mem_free(dmi_mem* s) {
     }
 }
 
-gchar *make_spd_section(spd_data *spd) {
-    gchar *ret = NULL;
-    if (spd) {
-        gchar *full_spd = NULL;
-        switch(spd->type) {
-            case SDR_SDRAM:
-                full_spd = decode_sdr_sdram_extra(spd->bytes);
-                break;
-            case DDR_SDRAM:
-                full_spd = decode_ddr_sdram_extra(spd->bytes);
-                break;
-            case DDR2_SDRAM:
-                full_spd = decode_ddr2_sdram_extra(spd->bytes);
-                break;
-            case DDR3_SDRAM:
-                full_spd = decode_ddr3_sdram_extra(spd->bytes);
-                break;
-            case DDR4_SDRAM:
-                full_spd = decode_ddr4_sdram_extra(spd->bytes, spd->spd_size);
-		break;
-            case DDR5_SDRAM:
-                full_spd = decode_ddr5_sdram_extra(spd->bytes, spd->spd_size);
-                break;
-            default:
-                DEBUG("blug for type: %d %s\n", spd->type, ram_types[spd->type]);
-        }
-        gchar *size_str = NULL;
-        if (!spd->size_MiB)
-            size_str = g_strdup(_("(Unknown)"));
-        else
-            size_str = g_strdup_printf("%"PRId64" %s", spd->size_MiB, _("MiB") );
-
-        gchar *mfg_date_str = NULL;
-        if (spd->year)
-            mfg_date_str = g_strdup_printf("%d / %d", spd->week, spd->year);
-
-        ret = g_strdup_printf("[%s]\n"
-                    "%s=%s (%s)%s\n"
-                    "%s=%d.%d\n"
-                    "%s=%s\n"
-                    "%s=%s\n"
-                    "$^$%s=[%02x%02x] %s\n" /* module vendor */
-                    "$^$%s=[%02x%02x] %s\n" /* dram vendor */
-                    "%s=%s\n" /* part */
-                    "%s=%s\n" /* size */
-                    "%s=%s\n" /* mfg date */
-                    "%s",
-                    _("Serial Presence Detect (SPD)"),
-                    _("Source"), spd->dev, spd->spd_driver, /*FIXME DDR5 changes?*/
-                        (spd->type == DDR4_SDRAM && strcmp(spd->spd_driver, "ee1004") != 0) ? problem_marker() : "",
-                    _("SPD Revision"), spd->spd_rev_major, spd->spd_rev_minor,
-                    _("Form Factor"), UNKIFNULL2(spd->form_factor),
-                    _("Type"), UNKIFEMPTY2(spd->type_detail),
-                    _("Module Vendor"), spd->vendor_bank, spd->vendor_index,
-                        UNKIFNULL2(spd->vendor_str),
-                    _("DRAM Vendor"), spd->dram_vendor_bank, spd->dram_vendor_index,
-                        UNKIFNULL2(spd->dram_vendor_str),
-                    _("Part Number"), UNKIFEMPTY2(spd->partno),
-                    _("Size"), size_str,
-                    _("Manufacturing Date (Week / Year)"), UNKIFNULL2(mfg_date_str),
-                    full_spd ? full_spd : ""
-                    );
-        g_free(full_spd);
-        g_free(size_str);
-        g_free(mfg_date_str);
-    }
-    return ret;
-}
 
 static gchar *tag_make_safe_inplace(gchar *tag) {
     if (!tag)
@@ -717,9 +634,9 @@ gchar *memory_devices_get_info() {
 
         if (a->size_MiB_max > 1024 && (a->size_MiB_max % 1024 == 0)
             && a->size_MiB_present > 1024 && (a->size_MiB_present % 1024 == 0) )
-            size_str = g_strdup_printf("%"PRId64" / %"PRId64" %s", a->size_MiB_present / 1024, a->size_MiB_max / 1024, _("GiB"));
+            size_str = g_strdup_printf("%u / %u %s", a->size_MiB_present / 1024, a->size_MiB_max / 1024, _("GiB"));
         else
-            size_str = g_strdup_printf("%"PRId64" / %"PRId64" %s", a->size_MiB_present, a->size_MiB_max, _("MiB"));
+            size_str = g_strdup_printf("%u / %u %s", a->size_MiB_present, a->size_MiB_max, _("MiB"));
 
         if (a->size_MiB_max < a->size_MiB_present) {
             sketchy_info = TRUE;
@@ -727,9 +644,9 @@ gchar *memory_devices_get_info() {
         }
 
         if (a->size_MiB_rom > 1024 && (a->size_MiB_rom % 1024 == 0))
-            rom_size_str = g_strdup_printf("%"PRId64" %s", a->size_MiB_rom / 1024, _("GiB"));
+            rom_size_str = g_strdup_printf("%u %s", a->size_MiB_rom / 1024, _("GiB"));
         else
-            rom_size_str = g_strdup_printf("%"PRId64" %s", a->size_MiB_rom, _("MiB"));
+            rom_size_str = g_strdup_printf("%u %s", a->size_MiB_rom, _("MiB"));
 
         gchar *types_str = NULL;
         int i;
@@ -783,7 +700,7 @@ gchar *memory_devices_get_info() {
             else if (!s->size_MiB)
                 size_str = g_strdup(s->size_str);
             else
-                size_str = g_strdup_printf("%"PRId64" %s", s->size_MiB, _("MiB") );
+                size_str = g_strdup_printf("%u %s", s->size_MiB, _("MiB") );
 
             gchar *spd = s->spd ? make_spd_section(s->spd) : NULL;
 
@@ -826,6 +743,7 @@ gchar *memory_devices_get_info() {
             g_free(spd);
             moreinfo_add_with_prefix(tag_prefix, tag, details); /* moreinfo now owns *details */
             gchar *mfgr = s->mfgr ? vendor_match_tag(s->mfgr,  params.fmt_opts) : NULL;
+	    if(!mfgr && s->mfgr) mfgr=g_strdup(s->mfgr);
             ret = h_strdup_cprintf("$!%s$%s=%s|%s|%s\n",
                     ret,
                     tag,
@@ -868,9 +786,9 @@ gchar *memory_devices_get_info() {
         gchar *size_str = NULL;
 
         if (mem->spd_size_MiB > 1024 && (mem->spd_size_MiB % 1024 == 0) )
-            size_str = g_strdup_printf("%"PRId64" %s", mem->spd_size_MiB / 1024, _("GiB"));
+            size_str = g_strdup_printf("%u %s", mem->spd_size_MiB / 1024, _("GiB"));
         else
-            size_str = g_strdup_printf("%"PRId64" %s", mem->spd_size_MiB, _("MiB"));
+            size_str = g_strdup_printf("%u %s", mem->spd_size_MiB, _("MiB"));
 
         int i;
         for(i = 1; i < N_RAM_TYPES; i++) {
@@ -916,7 +834,7 @@ gchar *memory_devices_get_info() {
         if (!s->size_MiB)
             size_str = g_strdup(_("(Unknown)"));
         else
-            size_str = g_strdup_printf("%"PRId64" %s", s->size_MiB, _("MiB") );
+            size_str = g_strdup_printf("%u %s", s->size_MiB, _("MiB") );
 
         gchar *details = make_spd_section(s);
 
@@ -997,9 +915,9 @@ gchar *memory_devices_get_system_memory_str() {
     dmi_mem_size m = memory_devices_get_system_memory_MiB();
     if (m) {
         if (m > 1024 && (m % 1024 == 0) )
-            ret = g_strdup_printf("%"PRId64" %s", m/1024, _("GiB"));
+            ret = g_strdup_printf("%u %s", m>>10, _("GiB"));
         else
-            ret = g_strdup_printf("%"PRId64" %s", m, _("MiB"));
+            ret = g_strdup_printf("%u %s", m, _("MiB"));
     }
     return ret;
 }
@@ -1007,40 +925,45 @@ gchar *memory_devices_get_system_memory_str() {
 static gchar note_state[note_max_len] = "";
 
 gboolean memory_devices_hinote(const char **msg) {
-    gchar *want_dmi    = "<b><i>dmidecode</i></b> package installed";
-    gchar *want_root   = "sudo chmod a+r /sys/firmware/dmi/tables/*";
-    gchar *want_at24   = "sudo modprobe at24 (or eeprom) (for SDR, DDR, DDR2, DDR3)";
-    gchar *want_ee1004 = "sudo modprobe ee1004 (for DDR4)";
-    gchar *want_spd5118 = "sudo modprobe spd5118 (for DDR5) (WIP)";
+    *note_state = 0; /* clear */
+    //check for dmi interface
+    gboolean has_dmi = g_file_test("/sys/firmware/dmi", G_FILE_TEST_IS_DIR);
+    if(!has_dmi) {
+        note_printf(note_state, "%s", _("No DMI available"));
+	*msg=note_state;
+        return TRUE;
+    }
+    gboolean has_dmiaccess = (access("/sys/firmware/dmi/tables/DMI", R_OK)==0) || (access("/sys/firmware/dmi/tables/smbios_entry_point", R_OK)==0);
+    gchar *want_dmi       = "<b><i>dmidecode</i></b> package installed";
+    gchar *want_dmiaccess = "sudo chmod a+r /sys/firmware/dmi/tables/*";
+    gchar *want_at24      = "sudo modprobe at24 (or eeprom) (for SDR, DDR, DDR2, DDR3)";
+    gchar *want_ee1004    = "sudo modprobe ee1004 (for DDR4)";
+    gchar *want_spd5118   = "sudo modprobe spd5118 (for DDR5)";
 
-    //gboolean has_root = (getuid() == 0);
-    gboolean has_dmi = !no_handles;
-    gboolean has_at24eep = g_file_test("/sys/bus/i2c/drivers/at24", G_FILE_TEST_IS_DIR) ||
-                           g_file_test("/sys/bus/i2c/drivers/eeprom", G_FILE_TEST_IS_DIR);
+    gboolean has_at24_eeprom = g_file_test("/sys/bus/i2c/drivers/at24", G_FILE_TEST_IS_DIR) ||
+                               g_file_test("/sys/bus/i2c/drivers/eeprom", G_FILE_TEST_IS_DIR);
     gboolean has_ee1004 = g_file_test("/sys/bus/i2c/drivers/ee1004", G_FILE_TEST_IS_DIR);
     gboolean has_spd5118 = g_file_test("/sys/bus/i2c/drivers/spd5118", G_FILE_TEST_IS_DIR);
 
-    *note_state = 0; /* clear */
     note_printf(note_state, "%s\n", _("Memory Information requires more Setup:"));
     note_print(note_state, "<tt>1. </tt>");
-    note_cond_bullet(has_dmi, note_state, want_dmi);
+    gboolean has_dmidecode = note_require_tool("dmidecode", note_state, want_dmi);
     note_print(note_state, "<tt>   </tt>");
-    note_cond_bullet(has_dmi, note_state, want_root);
+    note_cond_bullet(has_dmiaccess, note_state, want_dmiaccess);
     note_print(note_state, "<tt>2. </tt>");
-    note_cond_bullet(has_at24eep, note_state, want_at24);
+    note_cond_bullet(has_at24_eeprom, note_state, want_at24);
     note_print(note_state, "<tt>   </tt>");
     note_cond_bullet(has_ee1004, note_state, want_ee1004);
     note_print(note_state, "<tt>   </tt>");
     note_cond_bullet(has_spd5118, note_state, want_spd5118);
     g_strstrip(note_state); /* remove last \n */
 
-    gboolean ddr3_ee1004 = ((dmi_ram_types & (1<<(DDR3_SDRAM-1))) && has_ee1004);
+    gboolean ddr4 = dmi_ram_types & (1<<(DDR4_SDRAM-1));
+    gboolean ddr5 = dmi_ram_types & (1<<(DDR5_SDRAM-1));
 
-    //FIXME: Below is not updated for DDR5 and DDR5 SPD is not decoded!!
     gboolean best_state = FALSE;
-    if (has_dmi && /*has_root &&*/
-        ((has_at24eep && !spd_ddr4_partial_data)
-        || (has_ee1004 && !ddr3_ee1004) ) )
+    if (has_dmidecode && has_dmiaccess &&
+        ((has_at24_eeprom && !ddr4 && !ddr5) || (has_ee1004 && ddr4) || (has_spd5118 && ddr5) ))
         best_state = TRUE;
 
     if (!best_state) {

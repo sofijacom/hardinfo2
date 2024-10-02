@@ -24,6 +24,7 @@
 
 #include "iconcache.h"
 #include "config.h"
+#include "hardinfo.h"
 
 #define CRUNCH_TIME 3
 
@@ -130,6 +131,10 @@ gboolean on_draw (GtkWidget *widget, GdkEventExpose *event, gpointer data) {
 
 double guibench(double *frameTime, int *frameCount)
 {
+#if GTK_CHECK_VERSION(3, 0, 0)
+    GtkCssProvider *provider;
+    provider = gtk_css_provider_new();
+#endif
     GtkWindow * window;
 
     frametime=frameTime;
@@ -144,19 +149,18 @@ double guibench(double *frameTime, int *frameCount)
 
     // window setup
     window = (GtkWindow*)gtk_window_new(GTK_WINDOW_TOPLEVEL);
+
+    darkmode=(params.max_bench_results==1?1:0); //darkmode set by hardinfo2
+#if GTK_CHECK_VERSION(3, 0, 0)
+    if(darkmode){
+        gtk_css_provider_load_from_data(provider, "window { background-color: rgba(0x0, 0x0, 0x0, 1); } ", -1, NULL);
+        gtk_style_context_add_provider(gtk_widget_get_style_context((GtkWidget *)window), GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    }
+#endif
     gtk_window_set_default_size (window, 1024, 800);
     gtk_window_set_position     (window, GTK_WIN_POS_CENTER);
     gtk_window_set_title        (window, "GPU Benchmarking...");
     g_signal_connect(window, "destroy", gtk_main_quit, NULL);
-
-    //Get DarkMode state from system
-#if GTK_CHECK_VERSION(3,0,0)
-    GtkStyleContext *sctx=gtk_widget_get_style_context(GTK_WIDGET(window));
-    GdkRGBA color;
-    gtk_style_context_lookup_color(sctx, "theme_bg_color", &color);
-    darkmode=0;
-    if((color.red+color.green+color.blue)<=1.5) darkmode=1;
-#endif
 
     // create the are we can draw in
     GtkDrawingArea* drawingArea;

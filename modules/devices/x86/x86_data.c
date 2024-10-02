@@ -310,6 +310,7 @@ static struct flag_to_meaning *tab_flag_meaning;
 
 //static char all_flags[4096] = "";
 
+#if JSON_CHECK_VERSION(0,20,0)
 static void build_meaning_table_iter(JsonObject *object,
                                      const gchar *member_name,
                                      JsonNode *member_node,
@@ -324,6 +325,7 @@ static void build_meaning_table_iter(JsonObject *object,
 
     (*i)++;
 }
+#endif
 
 void cpuflags_x86_init(void)
 {
@@ -381,21 +383,3 @@ const char *x86_flag_meaning(const char *flag) {
     return NULL;
 }
 
-static void x86_flag_find_dups(void) {
-    int t, i;
-
-    t = 0;
-    while(tab_flag_meaning[t].name != NULL) {
-        i = t+1;
-        while(tab_flag_meaning[i].name != NULL) {
-            if (strcmp(tab_flag_meaning[t].name, tab_flag_meaning[i].name) == 0) {
-                printf("x86-flag duplicate definition: %s\n ... %d: %s\n ... %d: %s\n",
-                    tab_flag_meaning[i].name,
-                    t, tab_flag_meaning[t].meaning,
-                    i, tab_flag_meaning[i].meaning);
-            }
-            i++;
-        }
-        t++;
-    }
-}

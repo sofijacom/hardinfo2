@@ -56,6 +56,10 @@ typedef struct {
     char *linux_os;           /*distroversion*/
     char *power_state;
     char *gpu_name;
+    char *storage;
+    char *vulkanDriver;
+    char *vulkanDevice;
+    char *vulkanVersions;
 } bench_machine;
 
 typedef struct {
@@ -65,40 +69,6 @@ typedef struct {
     int legacy; /* an old benchmark.conf result */
 } bench_result;
 
-static char *cpu_config_retranslate(char *str, int force_en, int replacing)
-{
-    char *new_str = NULL;
-    char *mhz = (force_en) ? "MHz" : _("MHz");
-    char *c = str, *tmp;
-    int t;
-    float f;
-
-    if (str != NULL) {
-        new_str = strdup("");
-        if (strchr(str, 'x')) {
-	    while (c != NULL && (sscanf(c, "%dx %f", &t, &f)==2)) {
-                tmp = g_strdup_printf("%s%s%dx %.2f %s", new_str,
-                                      strlen(new_str) ? " + " : "", t, f, mhz);
-                free(new_str);
-                new_str = tmp;
-                c = strchr(c + 1, '+');
-                if (c)
-                    c++; /* move past the + */
-            }
-        } else {
-            sscanf(c, "%f", &f);
-            tmp = g_strdup_printf("%s%s%dx %.2f %s", new_str,
-                                  strlen(new_str) ? " + " : "", 1, f, mhz);
-            free(new_str);
-            new_str = tmp;
-        }
-
-        if (replacing)
-            free(str);
-    }
-
-    return new_str;
-}
 
 /* "2x 1400.00 MHz + 2x 800.00 MHz" -> 4400.0 */
 static float cpu_config_val(char *str)
@@ -119,29 +89,6 @@ static float cpu_config_val(char *str)
         }
     }
     return r;
-}
-
-static int cpu_config_cmp(char *str0, char *str1)
-{
-    float r0, r1;
-    r0 = cpu_config_val(str0);
-    r1 = cpu_config_val(str1);
-    if (r0 == r1)
-        return 0;
-    if (r0 < r1)
-        return -1;
-    return 1;
-}
-
-static int cpu_config_is_close(char *str0, char *str1)
-{
-    float r0, r1, r1n;
-    r0 = cpu_config_val(str0);
-    r1 = cpu_config_val(str1);
-    r1n = r1 * .9;
-    if (r0 > r1n && r0 < r1)
-        return 1;
-    return 0;
 }
 
 static void gen_machine_id(bench_machine *m)
@@ -187,14 +134,18 @@ bench_machine *bench_machine_this()
         m->ogl_renderer = module_call_method("computer::getOGLRenderer");
         tmp = module_call_method("computer::getMemoryTotal");
         m->memory_kiB = strtoull(tmp, NULL, 10);
+        free(tmp);
         m->memory_phys_MiB = memory_devices_get_system_memory_MiB();
         m->ram_types = memory_devices_get_system_memory_types_str();
-        m->machine_type = module_call_method("computer::getMachineType");
+        m->machine_type = module_call_method("computer::getMachineTypeEnglish");
 	m->linux_kernel = module_call_method("computer::getOSKernel");
 	m->linux_os = module_call_method("computer::getOS");
 	m->power_state= module_call_method("devices::getPowerState");
 	m->gpu_name= module_call_method("devices::getGPUname");
-        free(tmp);
+	m->storage= module_call_method("devices::getStorageDevicesModels");
+	m->vulkanDriver = module_call_method("computer::getVulkanDriver");
+	m->vulkanDevice = module_call_method("computer::getVulkanDevice");
+	m->vulkanVersions = module_call_method("computer::getVulkanVersions");
 
         cpu_procs_cores_threads_nodes(&m->processors, &m->cores, &m->threads, &m->nodes);
         gen_machine_id(m);
@@ -242,31 +193,6 @@ bench_result *bench_result_this_machine(const char *bench_name, bench_value r)
     return b;
 }
 
-/* -1 for none */
-static int nx_prefix(const char *str)
-{
-    char *s, *x;
-    if (str != NULL) {
-        s = (char *)str;
-        x = strchr(str, 'x');
-        if (x && x - s >= 1) {
-            while (s != x) {
-                if (!isdigit(*s))
-                    return -1;
-                s++;
-            }
-            *x = 0;
-            return atoi(str);
-        }
-    }
-    return -1;
-}
-
-static gboolean cpu_name_needs_cleanup(const char *cpu_name)
-{
-    return strstr(cpu_name, "Intel") || strstr(cpu_name, "AMD") ||
-           strstr(cpu_name, "VIA") || strstr(cpu_name, "Cyrix");
-}
 
 static void filter_invalid_chars(gchar *str)
 {
@@ -441,6 +367,7 @@ bench_result *bench_result_benchmarkjson(const gchar *bench_name,
         .machine_data_version = json_get_int(machine, "MachineDataVersion"),
         .machine_type = json_get_string_dup(machine, "MachineType"),
 	.gpu_name= json_get_string_dup(machine, "GPU"),
+	.storage= json_get_string_dup(machine, "Storage"),
 
     };
 
@@ -484,6 +411,7 @@ static char *bench_result_more_info_less(bench_result *b)
         /* threads */ "%s=%d\n"
         /* gpu desc */ "%s=%s\n"
         /* ogl rend */ "%s=%s\n"
+        /* storage */ "%s=%s\n"
         /* mem */ "%s=%s\n"
         /* bits */ "%s=%s\n",
         _("Benchmark Result"), _("Threads"), b->bvalue.threads_used,
@@ -505,6 +433,7 @@ static char *bench_result_more_info_less(bench_result *b)
         _("Threads Available"), b->machine->threads,
         _("GPU"), (b->machine->gpu_name != NULL) ? b->machine->gpu_name : (b->machine->gpu_desc != NULL) ? b->machine->gpu_desc : _(unk),
         _("OpenGL Renderer"), (b->machine->ogl_renderer != NULL) ? b->machine->ogl_renderer : _(unk),
+        _("Storage"), (b->machine->storage != NULL) ? b->machine->storage : _(unk),
         _("Memory"), memory,
         b->machine->ptr_bits ? _("Pointer Size") : "#AddySize", bits);
     free(memory);
@@ -541,6 +470,7 @@ static char *bench_result_more_info_complete(bench_result *b)
         /* threads */ "%s=%d\n"
         /* gpu desc */ "%s=%s\n"
         /* ogl rend */ "%s=%s\n"
+        /* storage */ "%s=%s\n"
         /* mem */ "%s=%" PRId64 " %s\n"
         /* mem phys */ "%s=%" PRId64 " %s %s\n"
         /* bits */ "%s=%s\n"
@@ -572,6 +502,8 @@ static char *bench_result_more_info_complete(bench_result *b)
         (b->machine->gpu_name != NULL) ? b->machine->gpu_name : (b->machine->gpu_desc != NULL) ? b->machine->gpu_desc : _(unk),
         _("OpenGL Renderer"),
         (b->machine->ogl_renderer != NULL) ? b->machine->ogl_renderer : _(unk),
+        _("Storage"),
+        (b->machine->storage != NULL) ? b->machine->storage : _(unk),
         _("Memory"), b->machine->memory_kiB, _("kiB"), _("Physical Memory"),
         b->machine->memory_phys_MiB, _("MiB"), b->machine->ram_types,
         b->machine->ptr_bits ? _("Pointer Size") : "#AddySize", bits,

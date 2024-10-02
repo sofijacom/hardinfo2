@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0.2)
 cmake_policy(VERSION 3.0.2)
 project(hardinfo2)
 
-set(HARDINFO2_VERSION "2.1.15")
+set(HARDINFO2_VERSION "2.1.18")
 
 option(HARDINFO2_SERVICE "Build with service support" 1)
 option(HARDINFO2_GTK3 "Build for GTK3 (0/off for GTK2)" 1)
@@ -11,6 +11,7 @@ option(HARDINFO2_QT5 "Build opengl benchmark for QT5 " 1)
 
 SET(CMAKE_INSTALL_PREFIX "/usr")
 SET(HARDINFO2_SYSTEMV 0)
+SET(HARDINFO2_RUNIT 0)
 
 SET(CMAKE_MODULE_PATH  "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(GNUInstallDirs)
@@ -98,7 +99,7 @@ string(REGEX REPLACE "\"" "" disversion "${disversion}")
 string(REGEX REPLACE "/" "" disversion "${disversion}")
 string(REGEX REPLACE " " "" disversion "${disversion}")
 #RPM Distro's
-if(${distro} MATCHES "Alma*" OR ${distro} MATCHES "Rocky*" OR ${distro} MATCHES "Fedora*" OR ${distro} MATCHES "Red*" OR ${distro} MATCHES "CentOS*" OR ${distro} MATCHES "Oracle*" OR ${distro} MATCHES "openSUSE*" OR ${distro} MATCHES "SUSE*" OR ${distro} MATCHES "PCLinuxOS*")
+if(${distro} MATCHES "Alma*" OR ${distro} MATCHES "Rocky*" OR ${distro} MATCHES "Fedora*" OR ${distro} MATCHES "RedHat*" OR ${distro} MATCHES "CentOS*" OR ${distro} MATCHES "Oracle*" OR ${distro} MATCHES "openSUSE*" OR ${distro} MATCHES "SUSE*" OR ${distro} MATCHES "PCLinuxOS*" OR ${distro} MATCHES "Ultramarine*" OR ${distro} MATCHES "Nobara*" OR ${distro} MATCHES "OpenMandriva*")
   set(RPM 1)
 endif()
 #Package architecture
@@ -218,6 +219,12 @@ if(${disversion} LESS 20.99)
   endif()
 endif()
 
+#slackware
+if(${distro} MATCHES "Slackware")
+    message("Slackware - LS24")
+    set(HARDINFO2_LIBSOUP3 0)
+endif()
+
 #PCLinuxOS
 if(${distro} MATCHES "PCLinux")
     set(HARDINFO2_SYSTEMV 1)
@@ -225,6 +232,15 @@ endif()
 
 #Devuan
 if(${distro} MATCHES "Devuan")
+    set(HARDINFO2_SYSTEMV 1)
+endif()
+#Devuan
+
+if(${distro} MATCHES "Void")
+    set(HARDINFO2_RUNIT 1)
+endif()
+
+if(${distro} MATCHES "Alpine")
     set(HARDINFO2_SYSTEMV 1)
 endif()
 
@@ -329,7 +345,6 @@ set(MODULE_computer_SOURCES
 	modules/computer/memory_usage.c
 	modules/computer/modules.c
 	modules/computer/os.c
-	modules/computer/ubuntu_flavors.c
 	modules/computer/uptime.c
 	modules/computer/users.c
 	modules/computer/groups.c
@@ -345,6 +360,7 @@ set(MODULE_devices_SOURCES
 	modules/devices/firmware.c
 	modules/devices/devicetree.c
 	modules/devices/inputdevices.c
+	modules/devices/spd-decode.c
 	modules/devices/pci.c
 	modules/devices/printers.c
 	modules/devices/resources.c
@@ -377,6 +393,7 @@ set(MODULE_benchmark_SOURCES
 	modules/benchmark/sysbench.c
 	modules/benchmark/iperf3.c
 	modules/benchmark/opengl.c
+	modules/benchmark/storage.c
 	modules/benchmark/drawing.c
 	modules/benchmark/guibench.c
 )
@@ -398,6 +415,7 @@ set(MODULE_benchmark_SOURCES
 	modules/benchmark/zlib.c
 	modules/benchmark/sysbench.c
 	modules/benchmark/iperf3.c
+	modules/benchmark/storage.c
 	modules/benchmark/drawing.c
 	modules/benchmark/guibench.c
 )
@@ -418,13 +436,13 @@ set_source_files_properties(
 	hardinfo2/problem_marker.c
 	hardinfo2/hinote_util.c
 	PROPERTIES
-	COMPILE_FLAGS "-std=c99 -Wall -Wextra -Wno-unused-function -Wno-switch -Werror=implicit-function-declaration"
+	COMPILE_FLAGS "-std=c99 -Wall -Wextra -Wno-switch -Werror=implicit-function-declaration"
 )
 
 foreach (_module ${HARDINFO2_MODULES})
 	add_library(${_module} MODULE ${MODULE_${_module}_SOURCES})
 	set_target_properties(${_module} PROPERTIES PREFIX "")
-	set_target_properties(${_module} PROPERTIES COMPILE_FLAGS "-Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-missing-braces -Wno-switch -Werror=implicit-function-declaration")
+	set_target_properties(${_module} PROPERTIES COMPILE_FLAGS "-Wall -Wextra -Wno-unused-parameter -Wno-missing-braces -Wno-switch -Werror=implicit-function-declaration")
 	target_link_libraries(${_module} ${JSON_GLIB_LIBRARIES})
 endforeach()
 
@@ -447,7 +465,7 @@ add_library(sysobj_early STATIC
 	deps/sysobj_early/src/format_early.c
 	deps/sysobj_early/src/cpubits.c
 )
-set_target_properties(sysobj_early PROPERTIES COMPILE_FLAGS "-std=c99 -Wall -Wextra -Wno-parentheses -Wno-unused-function -Werror=implicit-function-declaration")
+set_target_properties(sysobj_early PROPERTIES COMPILE_FLAGS "-std=c99 -Wall -Wextra -Wno-parentheses -Werror=implicit-function-declaration")
 target_link_libraries(sysobj_early m)
 
 if (HARDINFO2_GTK3)
@@ -475,14 +493,13 @@ set_source_files_properties(
 	hardinfo2/x_util.c
 	hardinfo2/dt_util.c
 	PROPERTIES
-	COMPILE_FLAGS "-Wall -Wextra -Wno-parentheses -Wno-unused-function -Werror=implicit-function-declaration"
+	COMPILE_FLAGS "-Wall -Wextra -Wno-parentheses -Werror=implicit-function-declaration"
 )
 
 if (HARDINFO2_GTK3)
 add_executable(hardinfo2
 	hardinfo2/usb_util.c
 	hardinfo2/pci_util.c
-	hardinfo2/binreloc.c
 	hardinfo2/expr.c
         hardinfo2/hardinfo.c
 	hardinfo2/socket.c
@@ -524,7 +541,6 @@ else()
 add_executable(hardinfo2
 	hardinfo2/usb_util.c
 	hardinfo2/pci_util.c
-	hardinfo2/binreloc.c
 	hardinfo2/expr.c
         hardinfo2/hardinfo.c
 	hardinfo2/socket.c
@@ -570,7 +586,10 @@ if(HARDINFO2_SERVICE)
     set(CMAKE_INSTALL_SERVICEDIR "/usr/lib" CACHE PATH "Path where the systemd service file gets installed")
     message("ServiceDir=" ${CMAKE_INSTALL_SERVICEDIR})
 
-    if(${HARDINFO2_SYSTEMV})
+    if(${HARDINFO2_RUNIT})
+        install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/tools/run DESTINATION /etc/sv/hardinfo2/
+        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+    elseif(${HARDINFO2_SYSTEMV})
         install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/tools/hardinfo2 DESTINATION /etc/init.d/
         PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
     else()
@@ -604,8 +623,8 @@ install(FILES ${HARDINFO2_MANPAGES}
 	DESTINATION ${CMAKE_INSTALL_MANDIR}/man1
 	PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
 )
-install(FILES pixmaps/hardinfo2.png
-    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps
+install(FILES pixmaps/hardinfo2.svg
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/scalable/apps
 	PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
 )
 
@@ -630,7 +649,7 @@ endif()
 SET(CPACK_RPM_PACKAGE_OBSOLETES "hardinfo")
 SET(CPACK_RPM_PACKAGE_MAINTAINER "hwspeedy <hardinfo2@bigbear.dk>")
 SET(CPACK_RPM_PACKAGE_DESCRIPTION "Hardinfo2 - System Information and Benchmark")
-SET(CPACK_RPM_PACKAGE_RECOMMENDS "sysbench, udisks2, mesa-utils, lsscsi, lm-sensors, xdg-utils, iperf3, fwupd")
+SET(CPACK_RPM_PACKAGE_RECOMMENDS "sysbench, udisks2, mesa-utils, lsscsi, lm_sensors, xdg-utils, iperf3, fwupd, xrandr, vulkan-tools")
 SET(CPACK_RPM_PACKAGE_LICENSE "GPL2+")
 SET(CPACK_RPM_PACKAGE_HOMEPAGE "https://github.com/hardinfo2/hardinfo2")
 SET(CPACK_RPM_PACKAGE_URL "https://www.hardinfo2.org")
@@ -656,7 +675,7 @@ SET(CPACK_DEBIAN_PACKAGE_REPLACES "hardinfo")
 SET(CPACK_DEBIAN_PACKAGE_BREAKS "hardinfo")
 SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "hwspeedy <hardinfo2@bigbear.dk>")
 SET(CPACK_DEBIAN_PACKAGE_DESCRIPTION "Hardinfo2 - System Information and Benchmark")
-SET(CPACK_DEBIAN_PACKAGE_RECOMMENDS "sysbench, udisks2, mesa-utils, lsscsi, lm-sensors, xdg-utils, iperf3, fwupd")
+SET(CPACK_DEBIAN_PACKAGE_RECOMMENDS "sysbench, udisks2, mesa-utils, lsscsi, lm-sensors, xdg-utils, iperf3, fwupd, x11-server-utils, vulkan-tools")
 SET(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://github.com/hardinfo2/hardinfo2")
 if(${HARDINFO2_LIBSOUP3})
     SET(PACKAGE_LS "libsoup-3.0-0 (>=3.0)")

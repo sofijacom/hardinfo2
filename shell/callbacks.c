@@ -184,6 +184,12 @@ void cb_disable_theme()
     g_key_file_free(key_file);
 
 #if GTK_CHECK_VERSION(3, 0, 0)
+    //Fix for budgie Fluent, mate
+    GtkCssProvider *providera;
+    providera = gtk_css_provider_new();
+    gtk_css_provider_load_from_data(providera,"notebook {background-color:unset;} scrolledwindow {background-color:unset;} viewport {background-color:unset;} frame {background-color:unset;}",-1,NULL);
+    gtk_style_context_add_provider_for_screen(gdk_screen_get_default(),GTK_STYLE_PROVIDER(providera),GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+
     if(params.theme>0){//enable
        if(params.darkmode){
 	   sprintf(theme_st,"window.background {background-image: url(\"%s/pixmaps/bg%d_dark.jpg\"); background-repeat: no-repeat; background-size:100%% 100%%; }",params.path_data,params.theme);
@@ -344,6 +350,7 @@ void cb_about()
         "Boris Afonot",
 	"Amstelchen",
 	"lucascastro",
+	"topazus",
 	"More contributors in GitHub",
 	"",
 	"Based on work by:",
@@ -361,6 +368,9 @@ void cb_about()
         "Vendor list based on GtkSysInfo by Pissens Sebastien",
         "DMI support based on code by Stewart Adam",
         "SCSI support based on code by Pascal F. Martin",
+	"OpenGL benchmark based on code by Zack Rusin",
+	"OpenGL benchmark based on code by David Reveman",
+	"OpenGL benchmark based on code by Peter Nilsson",
 	"",
 	"Translated by:",
 	"Alexander Münch",
@@ -384,6 +394,7 @@ void cb_about()
 	"Rawdanitsu",
 	"Larry Ewing",
 	"2x910",
+	"tutralex",
 	"",
 	"Packaging by:",
 	"Topazus (Fedora/Redhat branches)",
@@ -395,6 +406,9 @@ void cb_about()
 	"quincyf467 (Gentoo)",
 	"terryn94 (PCLinuxOS)",
 	"bjornfor (NixOS+NIX packages)",
+	"DidierSpaier (Slint)",
+	"B. Watson (Slackbuild packages)",
+	"K1ngfish3r (Clear Linux)",
 	"",
         NULL
     };

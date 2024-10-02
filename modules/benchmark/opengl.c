@@ -32,15 +32,16 @@ static bench_value opengl_bench(int opengl, int darkmode) {
     gchar *out=NULL, *err=NULL;
     int count, ms,ver,gl;
     float fps;
-
-    char cmd_line[100];
+    char *cmd_line;
+    
     if(opengl) {
-        sprintf(cmd_line, "%s/modules/qgears2 -gl %s",params.path_lib, (darkmode ? "-dark" : ""));
+        cmd_line=g_strdup_printf("%s/modules/qgears2 -gl %s",params.path_lib, (darkmode ? "-dark" : ""));
     } else {
-        sprintf(cmd_line, "%s/modules/qgears2 %s",params.path_lib, (darkmode ? "-dark" : ""));
+        cmd_line=g_strdup_printf("%s/modules/qgears2 %s",params.path_lib, (darkmode ? "-dark" : ""));
     }
 
     spawned = g_spawn_command_line_sync(cmd_line, &out, &err, NULL, NULL);
+    g_free(cmd_line);
     if (spawned && (sscanf(out,"Ver=%d, GL=%d, Result:%d/%d=%f", &ver, &gl, &count, &ms, &fps)==5)) {
             strncpy(ret.extra, out, sizeof(ret.extra)-1);
 	    ret.extra[sizeof(ret.extra)-1]=0;
@@ -61,10 +62,10 @@ void benchmark_opengl(void) {
     shell_view_set_enabled(FALSE);
     shell_status_update("Performing opengl benchmark (single thread)...");
 
-    r = opengl_bench(1,params.max_bench_results);
+    r = opengl_bench(1,(params.max_bench_results==1?1:0));
 
     if(r.threads_used!=1) {
-        r = opengl_bench(0,params.max_bench_results);
+        r = opengl_bench(0,(params.max_bench_results==1?1:0));
     }
     
     bench_results[BENCHMARK_OPENGL] = r;

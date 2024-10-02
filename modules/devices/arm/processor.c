@@ -375,6 +375,7 @@ gchar *processor_name(GSList *processors) {
         char *soc;
     } dt_compat_searches[] = {
         { "hardkernel,odroid-c2", "Amlogic", "S905" }, // C2
+        { "hardkernel,odroid-n2", "Amlogic", "S922x" }, // N2
         { "amlogic,a311d", "Amlogic", "A311D" }, // VIM3
         { "brcm,bcm2712", "Broadcom", "BCM2712" }, // RPi 5
         { "brcm,bcm2711", "Broadcom", "BCM2711" }, // RPi 4
@@ -438,14 +439,19 @@ gchar *processor_name(GSList *processors) {
         i = 0;
         while(dt_compat_searches[i].search_str != NULL) {
             if (strstr(compat, dt_compat_searches[i].search_str) != NULL) {
-                ret = g_strdup_printf("%s %s", dt_compat_searches[i].vendor, dt_compat_searches[i].soc);
+	        if(strstr(dt_compat_searches[i].soc,"Unknown"))
+		    ret = g_strdup_printf("%s %s (%s)", dt_compat_searches[i].vendor, dt_compat_searches[i].soc, compat);
+		else
+                    ret = g_strdup_printf("%s %s", dt_compat_searches[i].vendor, dt_compat_searches[i].soc);
                 break;
             }
             i++;
         }
+        if(!ret) ret = g_strdup_printf("ARM Processor (%s)", compat);
+        g_free(compat);
     }
-    g_free(compat);
-    UNKIFNULL(ret);
+
+    if(!ret) ret = g_strdup("ARM Processor (NoDT)");
     return ret;
 }
 

@@ -265,33 +265,32 @@ void scan_dev(gboolean reload)
     } detect_lang[] = {
        { N_("Scripting Languages"), NULL, FALSE },
        { N_("Gambas3 (gbr3)"), "gbr3 --version", "\\d+\\.\\d+\\.\\d+", TRUE },
-       { N_("Python (default)"), "python -V", "\\d+\\.\\d+\\.\\d+", FALSE },
+       { N_("Python (default)"), "python -V", "\\d+\\.\\d+\\.\\d+", TRUE },
        { N_("Python2"), "python2 -V", "\\d+\\.\\d+\\.\\d+", FALSE },
-       { N_("Python3"), "python3 -V", "\\d+\\.\\d+\\.\\d+", TRUE },
+       { N_("Python3"), "python3 -V", "\\d+\\.\\d+\\.\\d+(a|b|rc)?\\d*", TRUE },
        { N_("Perl"), "perl -v", "\\d+\\.\\d+\\.\\d+", TRUE },
-       { N_("Perl6 (VM)"), "perl6 -v", "(?<=This is ).*", TRUE },
-       { N_("Perl6"), "perl6 -v", "(?<=implementing Perl )\\w*\\.\\w*", TRUE },
+       { N_("Rakudo (Perl6)"), "rakudo -v", "(?<=Rakudo™ v)\\d+\\.\\d+", TRUE },
        { N_("PHP"), "php --version", "\\d+\\.\\d+\\.\\S+", TRUE},
        { N_("Ruby"), "ruby --version", "\\d+\\.\\d+\\.\\d+", TRUE },
-       { N_("Bash"), "bash --version", "\\d+\\.\\d+\\.\\S+", TRUE},
+       { N_("Bash"), "bash --version", "\\d+\\.\\d+\\.\\d+", TRUE},
        { N_("JavaScript (Node.js)"), "node --version", "(?<=v)(\\d\\.?)+", TRUE },
-       { N_("awk"), "awk --version", "GNU Awk \\d+\\.\\d+\\.\\d+", TRUE },
+       { N_("awk"), "awk --version", "(?<=GNU Awk )\\d+\\.\\d+\\.\\d+", TRUE },
        { N_("Compilers"), NULL, FALSE },
-       { N_("C (GCC)"), "gcc -v", "\\d+\\.\\d+\\.\\d+", FALSE },
-       { N_("C (Clang)"), "clang -v", "\\d+\\.\\d+", FALSE },
+       { N_("C (GCC)"), "gcc --version", "\\d+\\.\\d+\\.\\d+", TRUE },
+       { N_("C (Clang)"), "clang --version", "\\d+\\.\\d+\\.\\d+", TRUE },
        { N_("D (dmd)"), "dmd --help", "\\d+\\.\\d+", TRUE },
        { N_("Gambas3 (gbc3)"), "gbc3 --version", "\\d+\\.\\d+\\.\\d+", TRUE },
-       { N_("Java"), "javac -version", "\\d+\\.\\d+\\.\\d+", FALSE },
-       { N_("C♯ (mcs)"), "mcs --version", "\\d+\\.\\d+\\.\\d+\\.\\d+", TRUE },
+       { N_("Java"), "javac -version", "\\d+\\.\\d+\\.\\d+", TRUE },
+       { N_(".NET"), "dotnet --version", "\\d+\\.\\d+\\.\\d+", TRUE },
        { N_("Vala"), "valac --version", "\\d+\\.\\d+\\.\\d+", TRUE },
-       { N_("Haskell (GHC)"), "ghc -v", "\\d+\\.\\d+\\.\\d+", FALSE },
+       { N_("Haskell (GHC)"), "ghc --version", "\\d+\\.\\d+\\.\\d+", TRUE },
        { N_("FreePascal"), "fpc -iV", "\\d+\\.\\d+\\.?\\d*", TRUE },
        { N_("Go"), "go version", "\\d+\\.\\d+\\.?\\d* ", TRUE },
        { N_("Rust"), "rustc --version", "(?<=rustc )(\\d\\.?)+", TRUE },
        { N_("Tools"), NULL, FALSE },
        { N_("make"), "make --version", "\\d+\\.\\d+", TRUE },
        { N_("ninja"), "ninja --version", "\\d+\\.\\d+\\.\\d+", TRUE },
-       { N_("GDB"), "gdb --version", "(?<=^GNU gdb ).*", TRUE },
+       { N_("GDB"), "gdb --version", "\\d+\\.\\d+\\.?\\d*", TRUE },
        { N_("LLDB"), "lldb --version", "(?<=lldb version )(\\d\\.?)+", TRUE },
        { N_("strace"), "strace -V", "\\d+\\.\\d+\\.?\\d*", TRUE },
        { N_("valgrind"), "valgrind --version", "\\d+\\.\\d+\\.\\S+", TRUE },
@@ -299,7 +298,7 @@ void scan_dev(gboolean reload)
        { N_("CMake"), "cmake --version", "\\d+\\.\\d+\\.?\\d*", TRUE},
        { N_("Gambas3 IDE"), "gambas3 --version", "\\d+\\.\\d+\\.\\d+", TRUE },
        { N_("Radare2"), "radare2 -v", "(?<=radare2 )(\\d+\\.?)+(-git)?", TRUE },
-       { N_("ltrace"), "ltrace --version", "(?<=ltrace version )\\d+\\.\\d+\\.\\d+", TRUE },
+       { N_("ltrace"), "ltrace --version", "(?<=ltrace )\\d+\\.\\d+\\.\\d+", TRUE },
        { N_("Powershell"), "pwsh --version", "\\d+\\.\\d+\\.\\d+", TRUE },
     };
 
@@ -387,7 +386,7 @@ gchar *callback_memory_usage()
                lginterval);
 }
 
-static gchar *detect_machine_type(void)
+static gchar *detect_machine_type(int english)
 {
     GDir *dir;
     gchar *chassis;
@@ -399,7 +398,10 @@ static gchar *detect_machine_type(void)
     chassis = dtr_get_string("/model", 0);
     if (chassis) {
          g_free(chassis);
-         return g_strdup(_("Single-board computer"));
+	 if(english)
+             return g_strdup(N_("Single-board computer"));
+	 else
+             return g_strdup(_("Single-board computer"));
     }
 
     if (g_file_test("/proc/pmu/info", G_FILE_TEST_EXISTS))
@@ -434,7 +436,10 @@ static gchar *detect_machine_type(void)
                     g_free(contents);
                     g_dir_close(dir);
 
-                    return g_strdup(_("Laptop"));
+	            if(english)
+                        return g_strdup(N_("Laptop"));
+		    else
+                        return g_strdup(_("Laptop"));
                 }
 
                 g_free(contents);
@@ -446,14 +451,17 @@ static gchar *detect_machine_type(void)
 
     if(strstr(module_call_method("computer::getOSKernel"),"WSL2"))
         return g_strdup("WSL2");
-
-    return g_strdup(_("Unknown physical machine type"));
+    if(english)
+        return g_strdup(N_("Unknown physical machine type"));
+    else
+        return g_strdup(_("Unknown physical machine type"));
 }
 
 /* Table based off imvirt by Thomas Liske <liske@ibh.de>
    Copyright (c) 2008 IBH IT-Service GmbH under GPLv2. */
 char get_virtualization[100]={};
-gchar *computer_get_virtualization(void)
+char get_virtualization_english[100]={};
+gchar *computer_get_virtualization(int english)
 {
     gboolean found = FALSE;
     gint i, j;
@@ -492,23 +500,33 @@ gchar *computer_get_virtualization(void)
     };
     gchar *tmp;
     //Caching for speedup
-    if(get_virtualization[0]!=0) return g_strdup(get_virtualization);
+    if((get_virtualization[0]!=0) && (english==0)) return g_strdup(get_virtualization);
+    if((get_virtualization_english[0]!=0) && (english==1)) return g_strdup(get_virtualization_english);
 
     DEBUG("Detecting virtual machine");
 
     if (g_file_test("/proc/xen", G_FILE_TEST_EXISTS)) {
          DEBUG("/proc/xen found; assuming Xen");
-         return g_strdup(_("Virtual (Xen)"));
+	 if(english)
+             return g_strdup(N_("Virtual (Xen)"));
+	 else
+             return g_strdup(_("Virtual (Xen)"));
     }
 
     tmp = module_call_method("devices::getMotherboard");
     if (strstr(tmp, "VirtualBox") != NULL) {
         g_free(tmp);
-        return g_strdup(_("Virtual (VirtualBox)"));
+	if(english)
+            return g_strdup(N_("Virtual (VirtualBox)"));
+        else
+            return g_strdup(_("Virtual (VirtualBox)"));
     }
     if (strstr(tmp, "VMware") != NULL) {
         g_free(tmp);
-        return g_strdup(_("Virtual (VMware)"));
+	if(english)
+            return g_strdup(N_("Virtual (VMware)"));
+	else
+            return g_strdup(_("Virtual (VMware)"));
     }
     g_free(tmp);
 
@@ -529,20 +547,27 @@ gchar *computer_get_virtualization(void)
               fclose(file);
 
               if (found) {
-                  DEBUG("%s found (by reading file %s)",
-                        vm_types[j].vmtype, files[i]);
-		  strcpy(get_virtualization,_(vm_types[j].vmtype));//Save
-                  return g_strdup(_(vm_types[j].vmtype));
+                  DEBUG("%s found (by reading file %s)", vm_types[j].vmtype, files[i]);
+		  if(!english) strcpy(get_virtualization,_(vm_types[j].vmtype));//Save
+		  if(english) strcpy(get_virtualization_english,_(vm_types[j].vmtype));//Save
+		  if(english)
+                      return g_strdup(N_(vm_types[j].vmtype));
+		  else
+                      return g_strdup(_(vm_types[j].vmtype));
               }
          }
 
     }
 
     DEBUG("no virtual machine detected; assuming physical machine");
-    char *c=detect_machine_type();
-    strcpy(get_virtualization,c);//Save
-    free(c);
-    return g_strdup(get_virtualization);
+    gchar *c=detect_machine_type(english);
+    if(!english) strcpy(get_virtualization,c);//Save
+    if(english) strcpy(get_virtualization_english,c);//Save
+    g_free(c);
+    if(english)
+       return g_strdup(get_virtualization_english);
+    else
+       return g_strdup(get_virtualization);
 }
 
 gchar *callback_summary(void)
@@ -556,7 +581,7 @@ gchar *callback_summary(void)
             idle_free(module_call_method("devices::getProcessorNameAndDesc"))),
         info_field_update(_("Memory"), 1000),
         info_field_printf(_("Machine Type"), "%s",
-            computer_get_virtualization()),
+            computer_get_virtualization(0)),
         info_field(_("Operating System"), computer->os->distro),
         info_field(_("User Name"), computer->os->username),
         info_field_update(_("Date/Time"), 1000),
@@ -593,14 +618,13 @@ gchar *callback_os(void)
     info_set_view_type(info, SHELL_VIEW_DETAIL);
 
     distro_icon = computer->os->distroid
-       ? idle_free(g_strdup_printf("distros/%s.svg",computer->os->distroid))
+       ? idle_free(g_strdup_printf("LARGEdistros/%s.svg",computer->os->distroid))
        : NULL;
     distro = computer->os->distrocode
        ? idle_free(g_strdup_printf("%s (%s)",
          computer->os->distro, computer->os->distrocode))
        : computer->os->distro;
 
-    struct InfoGroup *version_group =
     info_add_group(
         info, _("Version"), info_field(_("Kernel"), computer->os->kernel),
         info_field(_("Command Line"), idle_free(strwrap(computer->os->kcmdline,80,' ')) ?: _("Unknown")),
@@ -610,13 +634,6 @@ gchar *callback_os(void)
                    .value_has_vendor = TRUE,
                    .icon = distro_icon),
         info_field_last());
-
-    if (computer->os->distro_flavor) {
-        info_group_add_field(version_group,
-            info_field(_("Spin/Flavor"), computer->os->distro_flavor->name,
-                .value_has_vendor = TRUE,
-                .icon = computer->os->distro_flavor->icon) );
-    }
 
     info_add_group(info, _("Current Session"),
         info_field(_("Computer Name"), computer->os->hostname),
@@ -768,6 +785,7 @@ gchar *callback_display(void)
     xinfo *xi = computer->display->xi;
     xrr_info *xrr = xi->xrr;
     glx_info *glx = xi->glx;
+    vk_info *vk = xi->vk;
     wl_info *wl = computer->display->wl;
 
     struct Info *info = info_new();
@@ -838,6 +856,24 @@ gchar *callback_display(void)
         info_field(_("GLX Version"), THISORUNK(glx->glx_version) ),
         info_field_last());
 
+    //Search for real vulkan GPU
+    int i=0;
+    while(i<VK_MAX_GPU && (vk->vk_devType[i]) && strstr(vk->vk_devType[i],"CPU")) i++;
+    if((i>=VK_MAX_GPU) || !vk->vk_devType[i] || strstr(vk->vk_devType[i],"CPU")) i=0;//not found set to first if any
+
+    info_add_group(info, _("Vulkan"),
+        info_field(_("Instance Version"), THISORUNK(vk->vk_instVer) ),
+        //GPU
+        info_field(_("Api Version"), THISORUNK(vk->vk_apiVer[i]) ),
+        info_field(_("Driver Version"), THISORUNK(vk->vk_drvVer[i]) ),
+        info_field(_("Vendor"), THISORUNK(vk->vk_vendorId[i]), .value_has_vendor = TRUE ),
+        info_field(_("Device Type"), THISORUNK(vk->vk_devType[i]) ),
+        info_field(_("Device Name"), THISORUNK(vk->vk_devName[i]) ),
+        info_field(_("Driver Name"), THISORUNK(vk->vk_drvName[i]) ),
+        info_field(_("Driver Info"), THISORUNK(vk->vk_drvInfo[i]) ),
+        info_field(_("Conformance Version"), THISORUNK(vk->vk_conformVer[i]) ),
+        info_field_last());
+
     return info_flatten(info);
 }
 
@@ -875,8 +911,54 @@ gchar *get_os_kernel(void)
 gchar *get_os(void)
 {
     scan_os(FALSE);
+    if(computer->os->distrocode) return g_strdup_printf("%s (%s)",computer->os->distro,computer->os->distrocode);
     return g_strdup(computer->os->distro);
 }
+
+gchar *get_os_short(void)
+{
+    scan_os(FALSE);
+    gchar *os=g_strdup(computer->os->distro);
+    strend(os,'-');
+    if(os[strlen(os)-1]==' ') os[strlen(os)-1]=0;
+    return os;
+}
+
+gchar *get_vulkan_driver(void) {
+    scan_display(FALSE);
+    //Search for real vulkan GPU
+    int i=0;
+    while(i<VK_MAX_GPU && (computer->display->xi->vk->vk_devType[i]) && strstr(computer->display->xi->vk->vk_devType[i],"CPU")) i++;
+    if((i>=VK_MAX_GPU) || !computer->display->xi->vk->vk_devType[i] || strstr(computer->display->xi->vk->vk_devType[i],"CPU")) i=0;//not found set to first if any
+
+    return g_strdup_printf("%s V:%s info:%s",THISORUNK(computer->display->xi->vk->vk_drvName[i]),THISORUNK(computer->display->xi->vk->vk_drvVer[i]),THISORUNK(computer->display->xi->vk->vk_drvInfo[i]));
+}
+
+gchar *get_vulkan_device(void) {
+    scan_display(FALSE);
+    //Search for real vulkan GPU
+    int i=0;
+    gchar *st="";
+    while(i<VK_MAX_GPU && (computer->display->xi->vk->vk_devType[i]) && strstr(computer->display->xi->vk->vk_devType[i],"CPU")) i++;
+    if((i>=VK_MAX_GPU) || !computer->display->xi->vk->vk_devType[i] || strstr(computer->display->xi->vk->vk_devType[i],"CPU")) i=0;//not found set to first if any
+    if(computer->display->xi->vk->vk_devType[i]){
+      st=computer->display->xi->vk->vk_devType[i];
+      if(strstr(computer->display->xi->vk->vk_devType[i],"CPU")) st="CPU";
+      if(strstr(computer->display->xi->vk->vk_devType[i],"GPU")) st="GPU";
+    }
+    return g_strdup_printf("%s:%s - %s",st,THISORUNK(computer->display->xi->vk->vk_vendorId[i]),THISORUNK(computer->display->xi->vk->vk_devName[i]));
+}
+
+gchar *get_vulkan_versions(void) {
+    scan_display(FALSE);
+    //Search for real vulkan GPU
+    int i=0;
+    while(i<VK_MAX_GPU && (computer->display->xi->vk->vk_devType[i]) && strstr(computer->display->xi->vk->vk_devType[i],"CPU")) i++;
+    if((i>=VK_MAX_GPU) || !computer->display->xi->vk->vk_devType[i] || strstr(computer->display->xi->vk->vk_devType[i],"CPU")) i=0;//not found set to first if any
+
+    return g_strdup_printf("inst:%s api:%s conform:%s type:%s",THISORUNK(computer->display->xi->vk->vk_instVer),THISORUNK(computer->display->xi->vk->vk_apiVer[i]),THISORUNK(computer->display->xi->vk->vk_conformVer[i]),THISORUNK(computer->display->session_type));
+}
+
 
 gchar *get_ogl_renderer(void)
 {
@@ -974,7 +1056,12 @@ const gchar *get_memory_desc(void) // [1] const (as to say "don't free")
 
 static gchar *get_machine_type(void)
 {
-    return computer_get_virtualization();
+    return computer_get_virtualization(0);
+}
+
+static gchar *get_machine_type_english(void)
+{
+    return computer_get_virtualization(1);
 }
 
 const ShellModuleMethod *hi_exported_methods(void)
@@ -982,6 +1069,7 @@ const ShellModuleMethod *hi_exported_methods(void)
     static const ShellModuleMethod m[] = {
         {"getOSKernel", get_os_kernel},
         {"getOS", get_os},
+        {"getOSshort", get_os_short},
         {"getDisplaySummary", get_display_summary},
         {"getOGLRenderer", get_ogl_renderer},
         {"getAudioCards", get_audio_cards},
@@ -989,6 +1077,10 @@ const ShellModuleMethod *hi_exported_methods(void)
         {"getMemoryTotal", get_memory_total},
         {"getMemoryDesc", get_memory_desc},
         {"getMachineType", get_machine_type},
+        {"getMachineTypeEnglish", get_machine_type_english},
+        {"getVulkanDriver", get_vulkan_driver},
+        {"getVulkanDevice", get_vulkan_device},
+        {"getVulkanVersions", get_vulkan_versions},
         {NULL},
     };
 
@@ -1019,14 +1111,14 @@ gchar **hi_module_get_dependencies(void)
 
 gchar *hi_module_get_summary(void)
 {
-    gchar *virt = computer_get_virtualization();
+    gchar *virt = computer_get_virtualization(0);
     gchar *machine_type = g_strdup_printf("%s (%s)",
                                           _("Motherboard"),
                                           (char*)idle_free(virt));
 
     return g_strdup_printf("[%s]\n"
                     "Icon=os.png\n"
-                    "Method=computer::getOS\n"
+                    "Method=computer::getOSshort\n"
                     "[%s]\n"
                     "Icon=processor.png\n"
                     "Method=devices::getProcessorNameAndDesc\n"
@@ -1120,6 +1212,7 @@ static const gchar *hinote_display() {
     *note = 0; /* clear */
     ok &= note_require_tool("xrandr", note, _("X.org's <i><b>xrandr</b></i> utility provides additional details when available."));
     ok &= note_require_tool("glxinfo", note, _("Mesa's <i><b>glxinfo</b></i> utility is required for OpenGL information."));
+    ok &= note_require_tool("vulkaninfo", note, _("Vulkan's <i><b>vulkaninfo</b></i> utility is required for Vulkan information."));
     return ok ? NULL : g_strstrip(note); /* remove last \n */
 }
 
