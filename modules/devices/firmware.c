@@ -91,18 +91,18 @@ const char *find_icon(const char *lvfs_name) {
      * in the fwupd source. */
     static const
     struct { char *lvfs, *hi; } imap[] = {
-        { "applications-internet", "dns.png" },
-        { "audio-card", "audio.png" },
-        { "computer", "computer.png" },
-        { "drive-harddisk", "hdd.png" },
-        { "input-gaming", "joystick.png" },
+        { "applications-internet", "internet.svg" },
+        { "audio-card", "audio.svg" },
+        { "computer", "computer.svg" },
+        { "drive-harddisk", "hdd.svg" },
+        { "input-gaming", "joystick.svg" },
         { "input-tablet", NULL },
-        { "network-modem", "wireless.png" },
-        { "preferences-desktop-keyboard", "keyboard.png" },
+        { "network-modem", "wireless.svg" },
+        { "preferences-desktop-keyboard", "keyboard.svg" },
         { "thunderbolt", NULL },
         { "touchpad-disabled", NULL },
         /* default */
-        { NULL, "memory.png" } /* a device with firmware maybe */
+        { NULL, "memory.svg" } /* a device with firmware maybe */
     };
     unsigned int i = 0;
     for(; imap[i].lvfs; i++) {

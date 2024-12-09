@@ -36,6 +36,226 @@ static const gchar *arm_mode_str[] = {
     "A32 on A64",
 };
 
+static gchar *__cache_get_info_as_string(GSList *cpu_cache)
+{
+    gchar *result = g_strdup("");
+    ProcessorCache *cache;
+    GSList *cache_list;
+
+    if (!cpu_cache) {
+        return g_strdup(_("Cache information not available=\n"));
+    }
+
+    for (cache_list = cpu_cache; cache_list; cache_list = cache_list->next) {
+        cache = (ProcessorCache *)cache_list->data;
+
+        result = h_strdup_cprintf(_("Level %d (%s)=%d-way set-associative, %d sets, %dKB size\n"),
+                                  result,
+                                  cache->level,
+                                  C_("cache-type", cache->type),
+                                  cache->ways_of_associativity,
+                                  cache->number_of_sets,
+                                  cache->size);
+    }
+
+    return result;
+}
+
+/* This is not used directly, but creates translatable strings for
+ * the type string returned from /sys/.../cache */
+//static const char* cache_types[] = {
+//    NC_("cache-type", /*/cache type, as appears in: Level 1 (Data)*/ "Data"),
+//    NC_("cache-type", /*/cache type, as appears in: Level 1 (Instruction)*/ "Instruction"),
+//    NC_("cache-type", /*/cache type, as appears in: Level 2 (Unified)*/ "Unified")
+//};
+
+static void __cache_obtain_info(Processor *processor)
+{
+    ProcessorCache *cache;
+    gchar *endpoint, *entry, *index;
+    gchar *uref = NULL;
+    gint i;
+    gint processor_number = processor->id;
+
+    endpoint = g_strdup_printf("/sys/devices/system/cpu/cpu%d/cache", processor_number);
+
+    for (i = 0; ; i++) {
+      cache = g_new0(ProcessorCache, 1);
+
+      index = g_strdup_printf("index%d/", i);
+
+      entry = g_strconcat(index, "type", NULL);
+      cache->type = h_sysfs_read_string(endpoint, entry);
+      g_free(entry);
+
+      if (!cache->type) {
+        g_free(cache);
+        g_free(index);
+        goto fail;
+      }
+
+      entry = g_strconcat(index, "level", NULL);
+      cache->level = h_sysfs_read_int(endpoint, entry);
+      g_free(entry);
+
+      entry = g_strconcat(index, "number_of_sets", NULL);
+      cache->number_of_sets = h_sysfs_read_int(endpoint, entry);
+      g_free(entry);
+
+      entry = g_strconcat(index, "physical_line_partition", NULL);
+      cache->physical_line_partition = h_sysfs_read_int(endpoint, entry);
+      g_free(entry);
+
+      entry = g_strconcat(index, "size", NULL);
+      cache->size = h_sysfs_read_int(endpoint, entry);
+      g_free(entry);
+
+      entry = g_strconcat(index, "ways_of_associativity", NULL);
+      cache->ways_of_associativity = h_sysfs_read_int(endpoint, entry);
+      g_free(entry);
+
+      /* unique cache references: id is nice, but share_cpu_list can be
+       * used if it is not available. */
+      entry = g_strconcat(index, "id", NULL);
+      uref = h_sysfs_read_string(endpoint, entry);
+      g_free(entry);
+      if (uref != NULL && *uref != 0 )
+        cache->uid = atoi(uref);
+      else
+        cache->uid = -1;
+      g_free(uref);
+      entry = g_strconcat(index, "shared_cpu_list", NULL);
+      cache->shared_cpu_list = h_sysfs_read_string(endpoint, entry);
+      g_free(entry);
+
+      /* reacharound */
+      entry = g_strconcat(index, "../../topology/physical_package_id", NULL);
+      cache->phy_sock = h_sysfs_read_int(endpoint, entry);
+      g_free(entry);
+
+      g_free(index);
+
+      processor->cache = g_slist_append(processor->cache, cache);
+    }
+
+fail:
+    g_free(endpoint);
+}
+
+
+#define cmp_cache_test(f) if (a->f < b->f) return -1; if (a->f > b->f) return 1;
+
+static gint cmp_cache(ProcessorCache *a, ProcessorCache *b) {
+        gint i = 0;
+        cmp_cache_test(phy_sock);
+        i = g_strcmp0(a->type, b->type); if (i!=0) return i;
+        cmp_cache_test(level);
+        cmp_cache_test(size);
+        cmp_cache_test(uid); /* uid is unique among caches with the same (type, level) */
+        if (a->uid == -1) {
+            /* if id wasn't available, use shared_cpu_list as a unique ref */
+            i = g_strcmp0(a->shared_cpu_list, b->shared_cpu_list); if (i!=0)
+            return i;
+        }
+        return 0;
+}
+
+static gint cmp_cache_ignore_id(ProcessorCache *a, ProcessorCache *b) {
+        gint i = 0;
+        cmp_cache_test(phy_sock);
+        i = g_strcmp0(a->type, b->type); if (i!=0) return i;
+        cmp_cache_test(level);
+        cmp_cache_test(size);
+        return 0;
+}
+
+gchar *caches_summary(GSList * processors)
+{
+    gchar *ret = g_strdup_printf("[%s]\n", _("Caches"));
+    GSList *all_cache = NULL, *uniq_cache = NULL;
+    GSList *tmp, *l;
+    Processor *p;
+    ProcessorCache *c, *cur = NULL;
+    gint cur_count = 0;
+
+    /* create list of all cache references */
+    for (l = processors; l; l = l->next) {
+        p = (Processor*)l->data;
+        if (p->cache) {
+            tmp = g_slist_copy(p->cache);
+            if (all_cache) {
+                all_cache = g_slist_concat(all_cache, tmp);
+            } else {
+                all_cache = tmp;
+            }
+        }
+    }
+
+    if (g_slist_length(all_cache) == 0) {
+        ret = h_strdup_cprintf("%s=\n", ret, _("(Not Available)") );
+        g_slist_free(all_cache);
+        return ret;
+    }
+
+    /* ignore duplicate references */
+    all_cache = g_slist_sort(all_cache, (GCompareFunc)cmp_cache);
+    for (l = all_cache; l; l = l->next) {
+        c = (ProcessorCache*)l->data;
+        if (!cur) {
+            cur = c;
+        } else {
+            if (cmp_cache(cur, c) != 0) {
+                uniq_cache = g_slist_prepend(uniq_cache, cur);
+                cur = c;
+            }
+        }
+    }
+    uniq_cache = g_slist_prepend(uniq_cache, cur);
+    uniq_cache = g_slist_reverse(uniq_cache);
+    cur = 0, cur_count = 0;
+
+    /* count and list caches */
+    for (l = uniq_cache; l; l = l->next) {
+        c = (ProcessorCache*)l->data;
+        if (!cur) {
+            cur = c;
+            cur_count = 1;
+        } else {
+            if (cmp_cache_ignore_id(cur, c) != 0) {
+                ret = h_strdup_cprintf(_("Level %d (%s)#%d=%dx %dKB (%dKB), %d-way set-associative, %d sets\n"),
+                                      ret,
+                                      cur->level,
+                                      C_("cache-type", cur->type),
+                                      cur->phy_sock,
+                                      cur_count,
+                                      cur->size,
+                                      cur->size * cur_count,
+                                      cur->ways_of_associativity,
+                                      cur->number_of_sets);
+                cur = c;
+                cur_count = 1;
+            } else {
+                cur_count++;
+            }
+        }
+    }
+    ret = h_strdup_cprintf(_("Level %d (%s)#%d=%dx %dKB (%dKB), %d-way set-associative, %d sets\n"),
+                          ret,
+                          cur->level,
+                          C_("cache-type", cur->type),
+                          cur->phy_sock,
+                          cur_count,
+                          cur->size,
+                          cur->size * cur_count,
+                          cur->ways_of_associativity,
+                          cur->number_of_sets);
+
+    g_slist_free(all_cache);
+    g_slist_free(uniq_cache);
+    return ret;
+}
+
+
 GSList *
 processor_scan(void)
 {
@@ -138,6 +358,8 @@ processor_scan(void)
     /* data not from /proc/cpuinfo */
     for (pi = procs; pi; pi = pi->next) {
         processor = (Processor *) pi->data;
+
+	__cache_obtain_info(processor);
 
         /* strings can't be null or segfault later */
         STRIFNULL(processor->linux_name, _("ARM Processor") );
@@ -310,14 +532,15 @@ gchar *clocks_summary(GSList * processors)
 gchar *
 processor_get_detailed_info(Processor *processor)
 {
-    gchar *tmp_flags, *tmp_imp = NULL, *tmp_part = NULL,
-        *tmp_arch, *tmp_cpufreq, *tmp_topology, *ret;
+    gchar *tmp_flags, *tmp_imp = NULL, *tmp_part = NULL, *tmp_cache;
+    gchar *tmp_arch, *tmp_cpufreq, *tmp_topology, *ret;
     tmp_flags = processor_get_capabilities_from_flags(processor->flags);
     arm_part(processor->cpu_implementer, processor->cpu_part, &tmp_imp, &tmp_part);
     tmp_arch = (char*)arm_arch_more(processor->cpu_architecture);
 
     tmp_topology = cputopo_section_str(processor->cputopo);
     tmp_cpufreq = cpufreq_section_str(processor->cpufreq);
+    tmp_cache = __cache_get_info_as_string(processor->cache);
 
     ret = g_strdup_printf("[%s]\n"
                        "%s=%s\n"       /* linux name */
@@ -326,17 +549,17 @@ processor_get_detailed_info(Processor *processor)
                        "%s=%.2f %s\n"  /* frequency */
                        "%s=%.2f\n"     /* bogomips */
                        "%s=%s\n"       /* byte order */
-                       "%s" /* topology */
-                       "%s" /* frequency scaling */
-                       "[%s]\n"    /* ARM */
+                       "%s"            /* topology */
+                       "%s"            /* frequency scaling */
+		       "[%s]\n%s\n"    /* cache */
+                       "[%s]\n"        /* ARM */
                        "%s=[%s] %s\n"  /* implementer */
                        "%s=[%s] %s\n"  /* part */
                        "%s=[%s] %s\n"  /* architecture */
                        "%s=%s\n"       /* variant */
                        "%s=%s\n"       /* revision */
-                       "[%s]\n" /* flags */
-                       "%s"
-                       "%s",    /* empty */
+                       "[%s]\n"        /* flags */
+		       "%s",
                    _("Processor"),
                    _("Linux Name"), processor->linux_name,
                    _("Decoded Name"), processor->model_name,
@@ -346,17 +569,18 @@ processor_get_detailed_info(Processor *processor)
                    _("Byte Order"), byte_order_str(),
                    tmp_topology,
                    tmp_cpufreq,
+		   _("Cache"), tmp_cache,
                    _("ARM"),
                    _("Implementer"), processor->cpu_implementer, (tmp_imp) ? tmp_imp : "",
                    _("Part"), processor->cpu_part, (tmp_part) ? tmp_part : "",
                    _("Architecture"), processor->cpu_architecture, (tmp_arch) ? tmp_arch : "",
                    _("Variant"), processor->cpu_variant,
                    _("Revision"), processor->cpu_revision,
-                   _("Capabilities"), tmp_flags,
-                    "");
+                   _("Capabilities"), tmp_flags);
     g_free(tmp_flags);
     g_free(tmp_cpufreq);
     g_free(tmp_topology);
+    g_free(tmp_cache);
     return ret;
 }
 
@@ -377,16 +601,17 @@ gchar *processor_name(GSList *processors) {
         { "hardkernel,odroid-c2", "Amlogic", "S905" }, // C2
         { "hardkernel,odroid-n2", "Amlogic", "S922x" }, // N2
         { "amlogic,a311d", "Amlogic", "A311D" }, // VIM3
-        { "brcm,bcm2712", "Broadcom", "BCM2712" }, // RPi 5
-        { "brcm,bcm2711", "Broadcom", "BCM2711" }, // RPi 4
-        { "brcm,bcm2837", "Broadcom", "BCM2837" }, // RPi 3
-        { "brcm,bcm2836", "Broadcom", "BCM2836" }, // RPi 2
-        { "brcm,bcm2835", "Broadcom", "BCM2835" }, // RPi 1
+        { "brcm,bcm2712", "Broadcom", "BCM2712 (RPi5)" }, // RPi 5
+        { "brcm,bcm2711", "Broadcom", "BCM2711 (RPi4)" }, // RPi 4
+        { "brcm,bcm2837", "Broadcom", "BCM2837 (RPi3)" }, // RPi 3
+        { "brcm,bcm2836", "Broadcom", "BCM2836 (RPi2)" }, // RPi 2
+        { "brcm,bcm2835", "Broadcom", "BCM2835 (RPi1)" }, // RPi 1
         { "rockchip,rk3288", "Rockchip", "RK3288" }, // Asus Tinkerboard
         { "rockchip,rk3328", "Rockchip", "RK3328" }, // Firefly Renegade
         { "rockchip,rk3399", "Rockchip", "RK3399" }, // Firefly Renegade Elite
         { "rockchip,rk32", "Rockchip", "RK32xx-family" },
         { "rockchip,rk33", "Rockchip", "RK33xx-family" },
+        { "rockchip,rk3588", "Rockchip", "RK3588" }, // rk3588-orangepi-5-max
         { "ti,omap5432", "Texas Instruments", "OMAP5432" },
         { "ti,omap5430", "Texas Instruments", "OMAP5430" },
         { "ti,omap4470", "Texas Instruments", "OMAP4470" },
@@ -399,15 +624,18 @@ gchar *processor_name(GSList *processors) {
         { "ti,omap3", "Texas Instruments", "OMAP3-family" },
         { "ti,omap2", "Texas Instruments", "OMAP2-family" },
         { "ti,omap1", "Texas Instruments", "OMAP1-family" },
-        { "mediatek,mt6799", "MediaTek", "MT6799 Helio X30" },
-        { "mediatek,mt6799", "MediaTek", "MT6799 Helio X30" },
-        { "mediatek,mt6797x", "MediaTek", "MT6797X Helio X27" },
-        { "mediatek,mt6797t", "MediaTek", "MT6797T Helio X25" },
-        { "mediatek,mt6797", "MediaTek", "MT6797 Helio X20" },
-        { "mediatek,mt6757T", "MediaTek", "MT6757T Helio P25" },
-        { "mediatek,mt6757", "MediaTek", "MT6757 Helio P20" },
-        { "mediatek,mt6795", "MediaTek", "MT6795 Helio X10" },
-        { "mediatek,mt6755", "MediaTek", "MT6755 Helio P10" },
+        { "mediatek,mt8173", "MediaTek", "MT8173" },
+        { "mediatek,mt8183", "MediaTek", "MT8183" },
+        { "mediatek,mt6895", "MediaTek", "MT6895" },
+        { "mediatek,mt6799", "MediaTek", "MT6799 (Helio X30)" },
+        { "mediatek,mt6799", "MediaTek", "MT6799 (Helio X30)" },
+        { "mediatek,mt6797x", "MediaTek", "MT6797X (Helio X27)" },
+        { "mediatek,mt6797t", "MediaTek", "MT6797T (Helio X25)" },
+        { "mediatek,mt6797", "MediaTek", "MT6797 (Helio X20)" },
+        { "mediatek,mt6757T", "MediaTek", "MT6757T (Helio P25)" },
+        { "mediatek,mt6757", "MediaTek", "MT6757 (Helio P20)" },
+        { "mediatek,mt6795", "MediaTek", "MT6795 (Helio X10)" },
+        { "mediatek,mt6755", "MediaTek", "MT6755 (Helio P10)" },
         { "mediatek,mt6750t", "MediaTek", "MT6750T" },
         { "mediatek,mt6750", "MediaTek", "MT6750" },
         { "mediatek,mt6753", "MediaTek", "MT6753" },
@@ -419,6 +647,8 @@ gchar *processor_name(GSList *processors) {
         { "qcom,msm8939", "Qualcomm", "Snapdragon 615"},
         { "qcom,msm", "Qualcomm", "Snapdragon-family"},
         { "nvidia,tegra", "nVidia", "Tegra-family" },
+        { "apple,t8112", "Apple", "T8112 (M2)" },
+        { "apple,t8103", "Apple", "T8103 (M1)" },
         { "brcm,", "Broadcom", UNKSOC },
         { "nvidia,", "nVidia", UNKSOC },
         { "rockchip,", "Rockchip", UNKSOC },
@@ -465,6 +695,7 @@ gchar *processor_meta(GSList * processors) {
     gchar *meta_cpu_topo = processor_describe_default(processors);
     gchar *meta_freq_desc = processor_frequency_desc(processors);
     gchar *meta_clocks = clocks_summary(processors);
+    gchar *meta_caches = caches_summary(processors);
     gchar *ret = NULL;
     UNKIFNULL(meta_cpu_desc);
     ret = g_strdup_printf("[%s]\n"
@@ -472,18 +703,20 @@ gchar *processor_meta(GSList * processors) {
                             "%s=%s\n"
                             "%s=%s\n"
                             "%s=%s\n"
+                            "%s"
                             "%s",
                             _("SOC/Package"),
                             _("Name"), meta_soc,
                             _("Description"), meta_cpu_desc,
                             _("Topology"), meta_cpu_topo,
                             _("Logical CPU Config"), meta_freq_desc,
-                            meta_clocks );
+			    meta_clocks, meta_caches );
     g_free(meta_soc);
     g_free(meta_cpu_desc);
     g_free(meta_cpu_topo);
     g_free(meta_freq_desc);
     g_free(meta_clocks);
+    g_free(meta_caches);
     return ret;
 }
 
@@ -493,6 +726,7 @@ gchar *processor_get_info(GSList * processors)
     gchar *ret, *tmp, *hashkey;
     gchar *meta; /* becomes owned by more_info? no need to free? */
     GSList *l;
+    gchar *icons=g_strdup("");
 
     tmp = g_strdup_printf("$!CPU_META$%s=\n", _("SOC/Package Information") );
 
@@ -501,6 +735,8 @@ gchar *processor_get_info(GSList * processors)
 
     for (l = processors; l; l = l->next) {
         processor = (Processor *) l->data;
+
+        icons = h_strdup_cprintf("Icon$CPU%d$cpu%d=processor.svg\n", icons, processor->id, processor->id);
 
         tmp = g_strdup_printf("%s$CPU%d$%s=%.2f %s\n",
                   tmp, processor->id,
@@ -515,9 +751,21 @@ gchar *processor_get_info(GSList * processors)
 
     ret = g_strdup_printf("[$ShellParam$]\n"
                   "ViewType=1\n"
+                  "ColumnTitle$TextValue=%s\n"
+                  "ColumnTitle$Value=%s\n"
+                  "ColumnTitle$Extra1=%s\n"
+                  "ColumnTitle$Extra2=%s\n"
+                  "ShowColumnHeaders=true\n"
+                  "%s"
                   "[Processors]\n"
-                  "%s", tmp);
+                  "%s", _("Device"), _("Frequency"), _("Model"), _("Socket:Core"), icons, tmp);
     g_free(tmp);
+    g_free(icons);
+
+    // now here's something fun...
+    struct Info *i = info_unflatten(ret);
+    g_free(ret);
+    ret = info_flatten(i);
 
     return ret;
 }

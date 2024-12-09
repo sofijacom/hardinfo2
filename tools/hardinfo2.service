@@ -1,10 +1,10 @@
 [Unit]
 Description=Hardinfo2 support for root access
-After=multi-user.target
+After=basic.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c "cat /proc/iomem >/tmp/hardinfo2_iomem;chmod a+r /tmp/hardinfo2_iomem;cat /proc/ioports >/tmp/hardinfo2_ioports;chmod a+r /tmp/hardinfo2_ioports;chmod a+r /sys/firmware/dmi/tables/*;modprobe -q spd5118;modprobe -q ee1004;modprobe -q at24 || true"
+ExecStart=/usr/bin/hwinfo2_fetch_sysdata
 
 [Install]
 WantedBy=basic.target

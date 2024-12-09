@@ -44,9 +44,9 @@ static const char mobo_location[] = "System Board Or Motherboard";
 static const char mobo_shorter[] = "Mainboard";
 static const dmi_type dta = 16; /* array */
 static const dmi_type dtm = 17; /* socket */
-static const char mem_icon[] = "memory.png";
-static const char array_icon[] = "devices.png";
-static const char empty_icon[] = "module.png";
+static const char mem_icon[] = "memory.svg";
+static const char array_icon[] = "computer.svg";
+static const char empty_icon[] = "module.svg";
 
 
 dmi_mem_size dmi_read_memory_str_to_MiB(const char *memstr) {
@@ -933,9 +933,9 @@ gboolean memory_devices_hinote(const char **msg) {
 	*msg=note_state;
         return TRUE;
     }
-    gboolean has_dmiaccess = (access("/sys/firmware/dmi/tables/DMI", R_OK)==0) || (access("/sys/firmware/dmi/tables/smbios_entry_point", R_OK)==0);
-    gchar *want_dmi       = "<b><i>dmidecode</i></b> package installed";
-    gchar *want_dmiaccess = "sudo chmod a+r /sys/firmware/dmi/tables/*";
+    gboolean has_dmiaccess = (access("/sys/firmware/dmi/tables/DMI", R_OK)==0) || (access("/sys/firmware/dmi/tables/smbios_entry_point", R_OK)==0) || (access("/run/hardinfo2/dmi_memory", R_OK)==0);
+    gchar *want_dmi       = _("<b><i>dmidecode</i></b> package installed");
+    gchar *want_dmiaccess = _("Ensure hardinfo2 service is enabled+started: sudo systemctl enable hardinfo2 --now (SystemD distro)\nAdd yourself to hardinfo2 group: sudo usermod -a -G hardinfo2 YOUR_LOGIN\nAnd Logout/Reboot for groups to be updated...");
     gchar *want_at24      = "sudo modprobe at24 (or eeprom) (for SDR, DDR, DDR2, DDR3)";
     gchar *want_ee1004    = "sudo modprobe ee1004 (for DDR4)";
     gchar *want_spd5118   = "sudo modprobe spd5118 (for DDR5)";

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" version="1.1" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+ <defs>
+  <radialGradient id="a" cx="255" cy="101" r="85" gradientTransform="matrix(.802 0 0 .899 51.3 6.32)" gradientUnits="userSpaceOnUse">
+   <stop style="stop-color:#000" offset="0"/>
+   <stop style="stop-color:#999" offset="1"/>
+  </radialGradient>
+ </defs>
+ <path d="m341 221v-119c0-44.4-38.2-80.7-84.9-80.7s-84.9 36.3-84.9 80.7v119" style="fill:none;stroke-width:40;stroke:url(#a)"/>
+ <ellipse cx="256" cy="345" rx="161" ry="166" fill="#7383bf"/>
+ <path d="m417 345c0-91.8-72.3-166-161-166v332c89.1 0 161-74.4 161-166z" fill="#556080"/>
+ <line x1="256" x2="256" y1="269" y2="234" style="fill:none;stroke-width:20;stroke:#f0b242"/>
+ <line x1="256" x2="256" y1="456" y2="421" style="fill:none;stroke-width:20;stroke:#f0b242"/>
+ <line x1="308" x2="332" y1="398" y2="423" style="fill:none;stroke-width:20;stroke:#f0b242"/>
+ <line x1="180" x2="204" y1="423" y2="398" style="fill:none;stroke-width:20;stroke:#f0b242"/>
+ <line x1="308" x2="332" y1="291" y2="266" style="fill:none;stroke-width:20;stroke:#f0b242"/>
+ <line x1="180" x2="204" y1="266" y2="291" style="fill:none;stroke-width:20;stroke:#f0b242"/>
+ <line x1="332" x2="366" y1="345" y2="345" style="fill:none;stroke-width:20;stroke:#f0b242"/>
+ <line x1="146" x2="180" y1="345" y2="345" style="fill:none;stroke-width:20;stroke:#f0b242"/>
+ <circle cx="256" cy="345" r="70" style="fill:#424a60;stroke-width:20;stroke:#f0b242"/>
+ <circle cx="256" cy="345" r="35" fill="#556080"/>
+</svg>

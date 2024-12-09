@@ -79,6 +79,7 @@ BENCH_SIMPLE(BENCHMARK_MEMORY_DUAL, "SysBench Memory (Two threads)", benchmark_m
 BENCH_SIMPLE(BENCHMARK_MEMORY_QUAD, "SysBench Memory (Quad threads)", benchmark_memory_quad, 1);
 BENCH_SIMPLE(BENCHMARK_MEMORY_ALL, "SysBench Memory (Multi-thread)", benchmark_memory_all, 1);
 BENCH_SIMPLE(BENCHMARK_STORAGE, "Storage R/W Speed", benchmark_storage, 1);
+BENCH_SIMPLE(BENCHMARK_CACHEMEM, "Cache/Memory", benchmark_cachemem, 1);
 
 BENCH_CALLBACK(callback_benchmark_gui, "GPU Drawing", BENCHMARK_GUI, 1);
 void scan_benchmark_gui(gboolean reload)
@@ -127,6 +128,7 @@ static char *entries_english_name[] = {
 	    ,"GPU OpenGL Drawing"
 #endif
 	    ,"Storage R/W Speed"
+	    ,"Cache/Memory"
 };
 
 
@@ -134,7 +136,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_BLOWFISH_SINGLE] =
         {
             N_("CPU Blowfish (Single-thread)"),
-            "blowfish.png",
+            "blowfish.svg",
             callback_benchmark_bfish_single,
             scan_benchmark_bfish_single,
             MODULE_FLAG_BENCHMARK,
@@ -142,7 +144,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_BLOWFISH_THREADS] =
         {
             N_("CPU Blowfish (Multi-thread)"),
-            "blowfish.png",
+            "blowfish.svg",
             callback_benchmark_bfish_threads,
             scan_benchmark_bfish_threads,
             MODULE_FLAG_BENCHMARK,
@@ -150,7 +152,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_BLOWFISH_CORES] =
         {
             N_("CPU Blowfish (Multi-core)"),
-            "blowfish.png",
+            "blowfish.svg",
             callback_benchmark_bfish_cores,
             scan_benchmark_bfish_cores,
             MODULE_FLAG_BENCHMARK,
@@ -158,7 +160,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_ZLIB] =
         {
             N_("CPU Zlib"),
-            "file-roller.png",
+            "compress.svg",
             callback_benchmark_zlib,
             scan_benchmark_zlib,
             MODULE_FLAG_BENCHMARK,
@@ -166,7 +168,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_CRYPTOHASH] =
         {
             N_("CPU CryptoHash"),
-            "cryptohash.png",
+            "cryptohash.svg",
             callback_benchmark_cryptohash,
             scan_benchmark_cryptohash,
             MODULE_FLAG_BENCHMARK,
@@ -174,7 +176,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_FIB] =
         {
             N_("CPU Fibonacci"),
-            "nautilus.png",
+            "nautilus.svg",
             callback_benchmark_fib,
             scan_benchmark_fib,
             MODULE_FLAG_BENCHMARK,
@@ -182,7 +184,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_NQUEENS] =
         {
             N_("CPU N-Queens"),
-            "nqueens.png",
+            "nqueens.svg",
             callback_benchmark_nqueens,
             scan_benchmark_nqueens,
             MODULE_FLAG_BENCHMARK,
@@ -190,7 +192,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_FFT] =
         {
             N_("FPU FFT"),
-            "fft.png",
+            "fft.svg",
             callback_benchmark_fft,
             scan_benchmark_fft,
             MODULE_FLAG_BENCHMARK,
@@ -198,7 +200,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_RAYTRACE] =
         {
             N_("FPU Raytracing (Single-thread)"),
-            "raytrace.png",
+            "raytrace.svg",
             callback_benchmark_raytrace,
             scan_benchmark_raytrace,
             MODULE_FLAG_BENCHMARK,
@@ -206,7 +208,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_IPERF3_SINGLE] =
         {
             N_("Internal Network Speed"),
-            "network.png",
+            "network.svg",
             callback_benchmark_iperf3_single,
             scan_benchmark_iperf3_single,
             MODULE_FLAG_BENCHMARK,
@@ -214,7 +216,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_SBCPU_SINGLE] =
         {
             N_("SysBench CPU (Single-thread)"),
-            "processor.png",
+            "processor.svg",
             callback_benchmark_sbcpu_single,
             scan_benchmark_sbcpu_single,
             MODULE_FLAG_BENCHMARK,
@@ -222,7 +224,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_SBCPU_ALL] =
         {
             N_("SysBench CPU (Multi-thread)"),
-            "processor.png",
+            "processor.svg",
             callback_benchmark_sbcpu_all,
             scan_benchmark_sbcpu_all,
             MODULE_FLAG_BENCHMARK,
@@ -230,7 +232,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_SBCPU_QUAD] =
         {
             N_("SysBench CPU (Four threads)"),
-            "processor.png",
+            "processor.svg",
             callback_benchmark_sbcpu_quad,
             scan_benchmark_sbcpu_quad,
             MODULE_FLAG_BENCHMARK|MODULE_FLAG_HIDE,
@@ -238,7 +240,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_MEMORY_SINGLE] =
         {
             N_("SysBench Memory (Single-thread)"),
-            "memory.png",
+            "memory.svg",
             callback_benchmark_memory_single,
             scan_benchmark_memory_single,
             MODULE_FLAG_BENCHMARK,
@@ -246,7 +248,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_MEMORY_DUAL] =
         {
             N_("SysBench Memory (Two threads)"),
-            "memory.png",
+            "memory.svg",
             callback_benchmark_memory_dual,
             scan_benchmark_memory_dual,
             MODULE_FLAG_BENCHMARK|MODULE_FLAG_HIDE,
@@ -254,7 +256,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_MEMORY_QUAD] =
         {
             N_("SysBench Memory (Quad threads)"),
-            "memory.png",
+            "memory.svg",
             callback_benchmark_memory_quad,
             scan_benchmark_memory_quad,
             MODULE_FLAG_BENCHMARK|MODULE_FLAG_HIDE,
@@ -262,7 +264,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_MEMORY_ALL] =
         {
             N_("SysBench Memory (Multi-thread)"),
-            "memory.png",
+            "memory.svg",
             callback_benchmark_memory_all,
             scan_benchmark_memory_all,
             MODULE_FLAG_BENCHMARK,
@@ -270,7 +272,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_GUI] =
         {
             N_("GPU Drawing"),
-            "monitor.png",
+            "monitor.svg",
             callback_benchmark_gui,
             scan_benchmark_gui,
             MODULE_FLAG_BENCHMARK|MODULE_FLAG_NO_REMOTE,
@@ -279,7 +281,7 @@ static ModuleEntry entries[] = {
     [BENCHMARK_OPENGL] =
         {
             N_("GPU OpenGL Drawing"),
-            "monitor.png",
+            "gpu.svg",
             callback_benchmark_opengl,
             scan_benchmark_opengl,
             MODULE_FLAG_BENCHMARK|MODULE_FLAG_NO_REMOTE,
@@ -288,9 +290,17 @@ static ModuleEntry entries[] = {
     [BENCHMARK_STORAGE] =
         {
             N_("Storage R/W Speed"),
-            "hdd.png",
+            "hdd.svg",
             callback_benchmark_storage,
             scan_benchmark_storage,
+            MODULE_FLAG_BENCHMARK,
+        },
+    [BENCHMARK_CACHEMEM] =
+        {
+            N_("Cache/Memory"),
+            "bolt.svg",
+            callback_benchmark_cachemem,
+            scan_benchmark_cachemem,
             MODULE_FLAG_BENCHMARK,
         },
     {NULL}};
@@ -326,6 +336,7 @@ const gchar *hi_note_func(gint entry)
         return _("Results in HIMarks. Higher is better.\n"
 		 "Many Desktop Environments only uses software.");
     case BENCHMARK_STORAGE:
+    case BENCHMARK_CACHEMEM:
         return _("Results in MB/s. Higher is better.");
 #if(HARDINFO2_QT5)
     case BENCHMARK_OPENGL:

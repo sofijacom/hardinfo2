@@ -28,12 +28,12 @@ static struct {
     char *name;
     char *icon;
 } input_devices[] = {
-    { NULL,       "module.png"   }, // UNKNOWN
-    { "Keyboard", "keyboard.png" },
-    { "Joystick", "joystick.png" },
-    { "Mouse",    "mouse.png"    },
-    { "Speaker",  "audio.png"    },
-    { "Audio",    "audio.png"    }
+    { NULL,       "module.svg"   }, // UNKNOWN
+    { "Keyboard", "keyboard.svg" },
+    { "Joystick", "joystick.svg" },
+    { "Mouse",    "mouse.svg"    },
+    { "Speaker",  "audio.svg"    },
+    { "Audio",    "audio.svg"    }
 };
 
 // source: https://elixir.bootlin.com/linux/v5.9/source/include/uapi/linux/input.h#L251

@@ -96,25 +96,25 @@ enum {
 };
 
 static ModuleEntry entries[] = {
-    [ENTRY_PROCESSOR] = {N_("Processor"), "processor.png", callback_processors, scan_processors, MODULE_FLAG_NONE},
-    [ENTRY_GPU] = {N_("Graphics Processors"), "devices.png", callback_gpu, scan_gpu, MODULE_FLAG_NONE},
-    [ENTRY_MONITORS] = {N_("Monitors"), "monitor.png", callback_monitors, scan_monitors, MODULE_FLAG_NONE},
-    [ENTRY_PCI] = {N_("PCI Devices"), "devices.png", callback_pci, scan_pci, MODULE_FLAG_NONE},
-    [ENTRY_USB] = {N_("USB Devices"), "usb.png", callback_usb, scan_usb, MODULE_FLAG_NONE},
-    [ENTRY_FW] = {N_("Firmware"), "processor.png", callback_firmware, scan_firmware, MODULE_FLAG_NONE},
-    [ENTRY_PRINTERS] = {N_("Printers"), "printer.png", callback_printers, scan_printers, MODULE_FLAG_NONE},
-    [ENTRY_BATTERY] = {N_("Battery"), "battery.png", callback_battery, scan_battery, MODULE_FLAG_NONE},
-    [ENTRY_SENSORS] = {N_("Sensors"), "therm.png", callback_sensors, scan_sensors, MODULE_FLAG_NONE},
-    [ENTRY_INPUT] = {N_("Input Devices"), "inputdevices.png", callback_input, scan_input, MODULE_FLAG_NONE},
-    [ENTRY_STORAGE] = {N_("Storage"), "hdd.png", callback_storage, scan_storage, MODULE_FLAG_NONE},
-    [ENTRY_DMI] = {N_("System DMI"), "computer.png", callback_dmi, scan_dmi, MODULE_FLAG_NONE},
-    [ENTRY_DMI_MEM] = {N_("Memory Devices"), "memory.png", callback_dmi_mem, scan_dmi_mem, MODULE_FLAG_NONE},
+    [ENTRY_PROCESSOR] = {N_("Processor"), "processor.svg", callback_processors, scan_processors, MODULE_FLAG_NONE},
+    [ENTRY_GPU] = {N_("Graphics Processors"), "gpu.svg", callback_gpu, scan_gpu, MODULE_FLAG_NONE},
+    [ENTRY_MONITORS] = {N_("Monitors"), "monitor.svg", callback_monitors, scan_monitors, MODULE_FLAG_NONE},
+    [ENTRY_PCI] = {N_("PCI Devices"), "pci.svg", callback_pci, scan_pci, MODULE_FLAG_NONE},
+    [ENTRY_USB] = {N_("USB Devices"), "usb.svg", callback_usb, scan_usb, MODULE_FLAG_NONE},
+    [ENTRY_FW] = {N_("Firmware"), "firmware.svg", callback_firmware, scan_firmware, MODULE_FLAG_NONE},
+    [ENTRY_PRINTERS] = {N_("Printers"), "printer.svg", callback_printers, scan_printers, MODULE_FLAG_NONE},
+    [ENTRY_BATTERY] = {N_("Battery"), "battery.svg", callback_battery, scan_battery, MODULE_FLAG_NONE},
+    [ENTRY_SENSORS] = {N_("Sensors"), "therm.svg", callback_sensors, scan_sensors, MODULE_FLAG_NONE},
+    [ENTRY_INPUT] = {N_("Input Devices"), "inputdevices.svg", callback_input, scan_input, MODULE_FLAG_NONE},
+    [ENTRY_STORAGE] = {N_("Storage"), "hdd.svg", callback_storage, scan_storage, MODULE_FLAG_NONE},
+    [ENTRY_DMI] = {N_("System DMI"), "dmi.svg", callback_dmi, scan_dmi, MODULE_FLAG_NONE},
+    [ENTRY_DMI_MEM] = {N_("Memory Devices"), "memory.svg", callback_dmi_mem, scan_dmi_mem, MODULE_FLAG_NONE},
 #if defined(ARCH_x86) || defined(ARCH_x86_64)
-    [ENTRY_DTREE] = {N_("Device Tree"), "devices.png", callback_dtree, scan_dtree, MODULE_FLAG_HIDE},
+    [ENTRY_DTREE] = {N_("Device Tree"), "devicetree.svg", callback_dtree, scan_dtree, MODULE_FLAG_HIDE},
 #else
-    [ENTRY_DTREE] = {N_("Device Tree"), "devices.png", callback_dtree, scan_dtree, MODULE_FLAG_NONE},
+    [ENTRY_DTREE] = {N_("Device Tree"), "devicetree.svg", callback_dtree, scan_dtree, MODULE_FLAG_NONE},
 #endif	/* x86 or x86_64 */
-    [ENTRY_RESOURCES] = {N_("Resources"), "resources.png", callback_device_resources, scan_device_resources, MODULE_FLAG_NONE},
+    [ENTRY_RESOURCES] = {N_("Resources"), "resources.svg", callback_device_resources, scan_device_resources, MODULE_FLAG_NONE},
     { NULL }
 };
 
@@ -131,8 +131,11 @@ gchar *gpuname=NULL;
 
 /* in dmi_memory.c */
 gchar *memory_devices_get_info();
+gchar *memory_devices_get_system_memory_types_str();
+gchar *memory_devices_get_system_memory_str();
 gboolean memory_devices_hinote(const char **msg);
 gchar *memory_devices_info = NULL;
+gchar *memory_devices_desc = NULL;
 
 /* in firmware.c */
 gchar *firmware_get_info();
@@ -395,6 +398,7 @@ gchar *get_power_state(void)
     if(!powerstate) return g_strdup("AC");
     return g_strdup(powerstate);
 }
+
 gchar *get_gpuname(void)
 {
     scan_gpu(FALSE);
@@ -405,6 +409,14 @@ gchar *get_gpuname(void)
     }
     return g_strdup(gpuname);
 }
+
+gchar *get_mem_desc(void)
+{
+    scan_dmi_mem(FALSE);
+    return g_strdup(memory_devices_desc);
+}
+
+
 
 /* TODO: maybe move into processor.c along with processor_name() etc.
  * Could mention the big.LITTLE cluster arangement for ARM that kind of thing.
@@ -632,6 +644,7 @@ const ShellModuleMethod *hi_exported_methods(void)
         {"getGPUList", get_gpu_summary},
         {"getPowerState", get_power_state},
         {"getGPUname", get_gpuname},
+	{"getMemDesc", get_mem_desc},
         {NULL},
     };
 
@@ -666,12 +679,17 @@ void scan_dmi(gboolean reload)
 
 void scan_dmi_mem(gboolean reload)
 {
-    DEBUG("SCAN_DMI_MEM %s",(reload?"RELOAD":"CACHED"));
     SCAN_START();
-    DEBUG("SCAN_DMI_MEM SCANNING");
-    if (memory_devices_info)
-        g_free(memory_devices_info);
+    if (memory_devices_info) g_free(memory_devices_info);
     memory_devices_info = memory_devices_get_info();
+    //
+    if (memory_devices_desc) g_free(memory_devices_desc);
+    gchar *st=memory_devices_get_system_memory_str();
+    if(st) {
+        memory_devices_desc = g_strdup_printf("%s %s",st,memory_devices_get_system_memory_types_str());
+    } else {
+        memory_devices_desc = NULL;
+    }
     SCAN_END();
 }
 
@@ -999,7 +1017,7 @@ const gchar *hi_note_func(gint entry)
     }
     if (entry == ENTRY_RESOURCES) {
         if (root_required_for_resources()) {
-            return g_strdup(_("Resource information requires superuser privileges"));
+            return g_strdup(_("Ensure hardinfo2 service is enabled+started: sudo systemctl enable hardinfo2 --now (SystemD distro)\nAdd yourself to hardinfo2 group: sudo usermod -a -G hardinfo2 YOUR_LOGIN\nAnd Logout/Reboot for groups to be updated..."));
         }
     }
     else if (entry == ENTRY_STORAGE){

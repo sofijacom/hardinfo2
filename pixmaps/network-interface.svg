@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" version="1.1" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+ <defs>
+  <linearGradient id="a" x1="258" x2="258" y1="102" y2="410" gradientUnits="userSpaceOnUse">
+   <stop style="stop-color:#bbb" offset="0"/>
+   <stop style="stop-color:#eee" offset="1"/>
+  </linearGradient>
+ </defs>
+ <rect x="9" y="64.7" width="494" height="383" rx="4.51" ry="4.51" style="fill:#fff;stroke-width:16;stroke:#0a0a0a"/>
+ <path d="m71.9 88.1h368c9.53 0 17.1 7.6 17.1 17l9.2e-4 215h-89.5v38.5h-35.8l1.7e-4 51.5h-152l-1.6e-4 -51.5h-35.8v-38.5h-89.5l-0.0013-215c-3.6e-5 -9.44 7.65-17 17.1-17z" style="fill:url(#a);stroke-width:8;stroke:#0a0a0a"/>
+ <rect x="93" y="88.4" width="20.2" height="89.9" style="fill:#ffce54;stroke-width:8;stroke:#191919"/>
+ <rect x="401" y="88.4" width="20.2" height="89.9" style="fill:#ffce54;stroke-width:8;stroke:#191919"/>
+ <rect x="313" y="88.4" width="20.2" height="89.9" style="fill:#ffce54;stroke-width:8;stroke:#191919"/>
+ <rect x="269" y="88.4" width="20.2" height="89.9" style="fill:#ffce54;stroke-width:8;stroke:#191919"/>
+ <rect x="225" y="88.4" width="20.2" height="89.9" style="fill:#ffce54;stroke-width:8;stroke:#191919"/>
+ <rect x="181" y="88.4" width="20.2" height="89.9" style="fill:#ffce54;stroke-width:8;stroke:#191919"/>
+ <rect x="137" y="88.4" width="20.2" height="89.9" style="fill:#ffce54;stroke-width:8;stroke:#191919"/>
+ <rect x="358" y="88.4" width="20.2" height="89.9" style="fill:#ffce54;stroke-width:8;stroke:#191919"/>
+ <rect x="54.6" y="355" width="79.8" height="61" rx="10" ry="10" style="fill:#1dfe0a;stroke-width:8;stroke:#0a0a0a"/>
+ <rect x="378" y="355" width="79.8" height="61" rx="10" ry="10" style="fill:#ffd10a;stroke-width:8;stroke:#0a0a0a"/>
+</svg>

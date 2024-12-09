@@ -236,8 +236,7 @@ void shell_status_pulse(void)
 	}
 
 	gtk_progress_bar_pulse(GTK_PROGRESS_BAR(shell->progress));
-	while (gtk_events_pending())
-	    gtk_main_iteration();
+	while (gtk_events_pending()) gtk_main_iteration();
     } else if (!params.quiet) {
 	static gint counter = 0;
 
@@ -269,7 +268,7 @@ void shell_status_set_percentage(gint percentage)
 
 void shell_view_set_enabled(gboolean setting)
 {
-    DEBUG("SHELL_VIEW=%s\n",setting?"Normal":"Busy");
+    //DEBUG("SHELL_VIEW=%s\n",setting?"Normal":"Busy");
     if (!params.gui_running)
 	return;
 
@@ -290,7 +289,7 @@ void shell_view_set_enabled(gboolean setting)
 
 void shell_status_set_enabled(gboolean setting)
 {
-    DEBUG("SHELL_STATUS=%d\n",setting?1:0);
+    //DEBUG("SHELL_STATUS=%d\n",setting?1:0);
     if (!params.gui_running)
 	return;
 
@@ -333,7 +332,7 @@ void shell_do_reload(gboolean reload)
 
 void shell_status_update(const gchar * message)
 {
-    DEBUG("Shell_status_update %s",message);
+    //DEBUG("Shell_status_update %s",message);
     if (params.gui_running) {
 	gtk_label_set_markup(GTK_LABEL(shell->status), message);
 	gtk_progress_bar_set_pulse_step(GTK_PROGRESS_BAR(shell->progress),1);
@@ -403,7 +402,7 @@ static void stylechange2_me(void)
 //gsettings
 static void stylechange3_me(void)
 {
-    gchar *theme=NULL;
+    gchar *theme=NULL,*scale=NULL;
     int newDark=0,i=0;
     gchar **keys=NULL;
     if(settings && !newgnome) keys=g_settings_list_keys(settings);
@@ -418,6 +417,10 @@ static void stylechange3_me(void)
 
     //new gnome using only normal/dark mode
     if(settings){
+        //FIXME get dynamic scaling info
+        //scale=g_settings_get_string(settings, "text-scaling-factor");
+	//if(scale) sscanf(scale,"%f",&params.scale);
+
         if(newgnome){
             theme = g_settings_get_string(settings, "color-scheme");
             if(strstr(theme,"Dark")||strstr(theme,"dark")) newDark=1;
@@ -462,7 +465,6 @@ static ShellNote *note_new(void)
     GtkWidget *hbox, *icon, *button;
     GtkWidget *border_box;
     GdkColor info_default_border_color     = { 0, 0x0000, 0xad00, 0x9d00 };
-    GdkColor info_default_fill_color       = { 0, 0x4000, 0x6000, 0xff00 };
 
     note = g_new0(ShellNote, 1);
     note->label = gtk_label_new("");
@@ -475,16 +477,22 @@ static ShellNote *note_new(void)
     gtk_widget_show(border_box);
 
 #if GTK_CHECK_VERSION(3, 0, 0)
-    GdkRGBA info_default_text_color       = { .red = 0.7, .green = 0.7, .blue = 0.7, .alpha = 1.0 };
+    GdkRGBA info_default_text_color       = { .red = 1, .green = 1, .blue = 1, .alpha = 1.0 };
     gtk_widget_override_color(note->label, GTK_STATE_FLAG_NORMAL, &info_default_text_color);
 #else
-    GdkColor info_default_text_color       = { 0, 0xafff, 0xafff, 0xafff };
+    GdkColor info_default_text_color       = { 0, 0xffff, 0xffff, 0xffff };
     gtk_widget_modify_fg(note->label, GTK_STATE_NORMAL, &info_default_text_color);
 #endif
-    gtk_widget_modify_bg(border_box, GTK_STATE_NORMAL, &info_default_fill_color);
+    if(params.darkmode){
+        GdkColor info_default_fill_color = { 0, 0x4000*1.1, 0x6000*1.1, 0xff00 };
+	gtk_widget_modify_bg(border_box, GTK_STATE_NORMAL, &info_default_fill_color);
+    } else {
+        GdkColor info_default_fill_color = { 0, 0x4000*0.9, 0x6000*0.9, 0xff00 };
+	gtk_widget_modify_bg(border_box, GTK_STATE_NORMAL, &info_default_fill_color);
+    }
     gtk_widget_modify_bg(note->event_box, GTK_STATE_NORMAL, &info_default_border_color);
 
-    icon = icon_cache_get_image("close.png");
+    icon = icon_cache_get_image_at_size("close.svg", 16, 16);
     gtk_widget_show(icon);
     gtk_container_add(GTK_CONTAINER(button), icon);
     gtk_button_set_relief(GTK_BUTTON(button), GTK_RELIEF_NONE);
@@ -496,9 +504,9 @@ static ShellNote *note_new(void)
 #else
     hbox = gtk_hbox_new(FALSE, 3);
 #endif
-    icon = icon_cache_get_image("dialog-information.png");
+    icon = icon_cache_get_image("dialog-information.svg");
 
-    gtk_box_pack_start(GTK_BOX(hbox), icon, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(hbox), icon, FALSE, FALSE, 4);
     gtk_box_pack_start(GTK_BOX(hbox), note->label, FALSE, FALSE, 0);
     gtk_box_pack_end(GTK_BOX(hbox), button, FALSE, FALSE, 0);
 
@@ -530,10 +538,9 @@ static void create_window(void)
     shell = g_new0(Shell, 1);
 
     shell->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    gtk_window_set_icon(GTK_WINDOW(shell->window),
-			icon_cache_get_pixbuf("hardinfo2.png"));
+    gtk_window_set_icon(GTK_WINDOW(shell->window), icon_cache_get_pixbuf("hardinfo2.svg"));
     shell_set_title(shell, NULL);
-    gtk_window_set_default_size(GTK_WINDOW(shell->window), 1280, 800);
+    gtk_window_set_default_size(GTK_WINDOW(shell->window), 1280*params.scale, 800*params.scale);
     g_signal_connect(G_OBJECT(shell->window), "destroy", destroy_me, NULL);
 #if GTK_CHECK_VERSION(3, 0, 0)
     g_signal_connect(G_OBJECT(shell->window), "style-updated", stylechange_me, NULL);
@@ -650,58 +657,6 @@ static void view_menu_select_entry(gpointer data, gpointer data2)
     gtk_tree_path_free(path);
 }
 
-static void menu_item_set_icon_always_visible(Shell *shell,
-                                              gchar *parent_path,
-                                              gchar *item_id)
-{
-    //GtkWidget *menuitem;
-    //gchar *path;
-
-    //path = g_strdup_printf("%s/%s", parent_path, item_id);
-    //menuitem = gtk_ui_manager_get_widget(shell->ui_manager, path);
-
-    //gtk_image_menu_item_set_always_show_image(GTK_IMAGE_MENU_ITEM(menuitem), TRUE);
-    //g_free(path);
-}
-
-
-static void
-add_module_entry_to_view_menu(gchar * module, gchar * name,
-			      GdkPixbuf * pixbuf, GtkTreeIter * iter)
-{
-    GtkAction *action;
-    //GtkWidget *menuitem;
-    gint merge_id;
-    gchar *path;
-    GtkActionEntry entry = {
-       name,			/* name */
-       name,			/* stockid */
-       name,			/* label */
-       NULL,			/* accelerator */
-       NULL,			/* tooltip */
-       (GCallback) view_menu_select_entry,	/* callback */
-    };
-
-    stock_icon_register_pixbuf(pixbuf, name);
-
-    if ((action = gtk_action_group_get_action(shell->action_group, name))) {
-        gtk_action_group_remove_action(shell->action_group, action);
-    }
-
-    gtk_action_group_add_actions(shell->action_group, &entry, 1, iter);
-
-    merge_id = gtk_ui_manager_new_merge_id(shell->ui_manager);
-    path = g_strdup_printf("/menubar/ViewMenu/%s", module);
-    gtk_ui_manager_add_ui(shell->ui_manager,
-                          merge_id,
-                          path,
-			  name, name, GTK_UI_MANAGER_AUTO, FALSE);
-    shell->merge_ids = g_slist_prepend(shell->merge_ids, GINT_TO_POINTER(merge_id));
-
-    menu_item_set_icon_always_visible(shell, path, name);
-
-    g_free(path);
-}
 
 void shell_add_modules_to_gui(gpointer _shell_module, gpointer _shell_tree)
 {
@@ -745,10 +700,6 @@ void shell_add_modules_to_gui(gpointer _shell_module, gpointer _shell_tree)
 		gtk_tree_store_set(store, &child, TREE_COL_PBUF,
 				   entry->icon, -1);
 	    }
-
-	    add_module_entry_to_view_menu(module->name, entry->name,
-					  entry->icon,
-					  gtk_tree_iter_copy(&child));
 
 	    shell_status_pulse();
 	}
@@ -944,7 +895,7 @@ static gboolean update_field(gpointer data)
     fu = (ShellFieldUpdate *)data;
     g_return_val_if_fail(fu != NULL, FALSE);
 
-    DEBUG("update_field [%s]", fu->field_name);
+    //DEBUG("update_field [%s]", fu->field_name);
 
     item = g_hash_table_lookup(update_tbl, fu->field_name);
     if (!item) {
@@ -978,7 +929,7 @@ static gboolean update_field(gpointer data)
             gtk_tree_store_set(store, item->iter, INFO_TREE_COL_VALUE, value, -1);
         } else {
             GList *children = gtk_container_get_children(GTK_CONTAINER(item->widget));
-            gtk_label_set_markup(GTK_LABEL(children->next->data), value);
+	    if(children && children->next->data && value) gtk_label_set_markup(GTK_LABEL(children->next->data), value);
             g_list_free(children);
         }
 
@@ -1038,9 +989,6 @@ static void detail_view_clear(DetailView *detail_view)
 static gboolean reload_section(gpointer data)
 {
     ShellModuleEntry *entry = (ShellModuleEntry *)data;
-#if GTK_CHECK_VERSION(2, 14, 0)
-    //GdkWindow *gdk_window = gtk_widget_get_window(GTK_WIDGET(shell->window));
-#endif
 
     /* if the entry is still selected, update it */
     if (entry->selected) {
@@ -1048,6 +996,9 @@ static gboolean reload_section(gpointer data)
         GtkTreeIter iter;
         double pos_info_scroll;
         double pos_detail_scroll;
+
+	/*Freeze window updates*/
+	gdk_window_freeze_updates(gtk_widget_get_window(shell->window));
 
         /* save current position */
         pos_info_scroll = RANGE_GET_VALUE(info_tree, vscrollbar);
@@ -1061,7 +1012,6 @@ static gboolean reload_section(gpointer data)
 
         /* update the information, clear the treeview and populate it again */
         module_entry_reload(entry);
-        detail_view_clear(shell->detail_view);
         module_selected_show_info(entry, TRUE);
 
         /* if there was a selection, reselect it */
@@ -1070,14 +1020,16 @@ static gboolean reload_section(gpointer data)
             gtk_tree_view_set_cursor(GTK_TREE_VIEW(shell->info_tree->view),
                                      path, NULL, FALSE);
             gtk_tree_path_free(path);
-        } else {
-            /* restore position */
-            RANGE_SET_VALUE(info_tree, vscrollbar, pos_info_scroll);
         }
 
-        RANGE_SET_VALUE(detail_view, vscrollbar, pos_detail_scroll);
+        /* restore position */
+        if(pos_info_scroll) RANGE_SET_VALUE(info_tree, vscrollbar, pos_info_scroll);
+        if(pos_detail_scroll) RANGE_SET_VALUE(detail_view, vscrollbar, pos_detail_scroll);
 
+	/*UnFreeze widget updates*/
+        gdk_window_thaw_updates(gtk_widget_get_window(shell->window));
     }
+
 
     /* destroy the timeout: it'll be set up again */
     return FALSE;
@@ -1270,7 +1222,6 @@ static void group_handle_special(GKeyFile *key_file,
             const gchar *chk = g_utf8_strchr(key, -1, '$');
             fu->field_name = g_strdup(key_is_flagged(chk) ? chk : chk + 1);
             fu->entry = entry;
-
             sfutbl = g_new0(ShellFieldUpdateSource, 1);
             sfutbl->source_id = g_timeout_add(ms, update_field, fu);
             sfutbl->sfu = fu;
@@ -1635,7 +1586,7 @@ static void module_selected_show_info_list(GKeyFile *key_file,
 #if GTK_CHECK_VERSION(3, 0, 0)
     if(params.theme>0){
       if(params.darkmode){
-        gtk_css_provider_load_from_data(provider, "treeview { background-color: rgba(0xa0, 0xa0, 0xa0, 0.1); } treeview:selected { background-color: rgba(0x60, 0x80, 0xff, 1); } ", -1, NULL);
+        gtk_css_provider_load_from_data(provider, "treeview { background-color: rgba(0xa0, 0xa0, 0xa0, 0.1); } treeview:selected { background-color: rgba(0x40, 0x60, 0xff, 1); } ", -1, NULL);
         gtk_style_context_add_provider(gtk_widget_get_style_context(shell->info_tree->view), GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
       }else{
         gtk_css_provider_load_from_data(provider, "treeview { background-color: rgba(0x60, 0x60, 0x60, 0.1); } treeview:selected { background-color: rgba(0x40, 0x60, 0xff, 1); } ", -1, NULL);
@@ -1838,7 +1789,6 @@ static void module_selected_show_info_detail(GKeyFile *key_file,
 static void
 module_selected_show_info(ShellModuleEntry *entry, gboolean reload)
 {
-    //GdkWindow *gdk_window = gtk_widget_get_window(GTK_WIDGET(shell->info_tree->view));
     gsize ngroups;
     gint i;
 
@@ -2359,8 +2309,13 @@ static ShellTree *tree_new()
 
 #if GTK_CHECK_VERSION(3, 0, 0)
     if(params.theme>0){
-        gtk_css_provider_load_from_data(provider, "treeview { background-color: rgba(0x60, 0x60, 0x60, 0.1); } treeview:selected { background-color: rgba(0x40, 0x60, 0xff, 1); } ", -1, NULL);
-        gtk_style_context_add_provider(gtk_widget_get_style_context(treeview), GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+        if(params.darkmode){
+            gtk_css_provider_load_from_data(provider, "treeview { background-color: rgba(0xa0, 0xa0, 0xa0, 0.1); } treeview:selected { background-color: rgba(0x40, 0x60, 0xff, 1); } ", -1, NULL);
+            gtk_style_context_add_provider(gtk_widget_get_style_context(treeview), GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+        } else {
+            gtk_css_provider_load_from_data(provider, "treeview { background-color: rgba(0x60, 0x60, 0x60, 0.1); } treeview:selected { background-color: rgba(0x40, 0x60, 0xff, 1); } ", -1, NULL);
+            gtk_style_context_add_provider(gtk_widget_get_style_context(treeview), GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+        }
     }
 #endif
 

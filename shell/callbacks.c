@@ -203,20 +203,20 @@ void cb_disable_theme()
            gtk_css_provider_load_from_data(provider2, "* { background-color: rgba(0xa0, 0xa0, 0xa0, 0.1); } * text { background-color: rgba(1, 1, 1, 1); }", -1, NULL);
            if(shell->ui_manager) gtk_style_context_add_provider(gtk_widget_get_style_context(gtk_ui_manager_get_widget(shell->ui_manager,"/MainMenuBarAction")), GTK_STYLE_PROVIDER(provider2), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
            //treeviewinfo
-           gtk_css_provider_load_from_data(provider3, "treeview { background-color: rgba(0xa0, 0xa0, 0xa0, 0.1); } treeview:selected { background-color: rgba(0x60, 0x80, 0xff, 1); } ", -1, NULL);
+           gtk_css_provider_load_from_data(provider3, "treeview { background-color: rgba(0xa0, 0xa0, 0xa0, 0.1); } treeview:selected { background-color: rgba(0x40, 0x60, 0xff, 1); } ", -1, NULL);
            if(shell->info_tree && shell->info_tree->view) gtk_style_context_add_provider(gtk_widget_get_style_context(shell->info_tree->view), GTK_STYLE_PROVIDER(provider3), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
            //treeviewmain
-           gtk_css_provider_load_from_data(provider3, "treeview { background-color: rgba(0xa0, 0xa0, 0xa0, 0.1); } treeview:selected { background-color: rgba(0x60, 0x80, 0xff, 1); } ", -1, NULL);
+           gtk_css_provider_load_from_data(provider3, "treeview { background-color: rgba(0xa0, 0xa0, 0xa0, 0.1); } treeview:selected { background-color: rgba(0x40, 0x60, 0xff, 1); } ", -1, NULL);
            if(shell->tree && shell->tree->view) gtk_style_context_add_provider(gtk_widget_get_style_context(shell->tree->view), GTK_STYLE_PROVIDER(provider3), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
        }else{
            //menubar
            gtk_css_provider_load_from_data(provider2, "* { background-color: rgba(0x60, 0x60, 0x60, 0.1); } * text { background-color: rgba(1, 1, 1, 1); }", -1, NULL);
            if(shell->ui_manager) gtk_style_context_add_provider(gtk_widget_get_style_context(gtk_ui_manager_get_widget(shell->ui_manager,"/MainMenuBarAction")), GTK_STYLE_PROVIDER(provider2), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
            //treeviewinfo
-           gtk_css_provider_load_from_data(provider3, "treeview { background-color: rgba(0x60, 0x60, 0x60, 0.1); } treeview:selected { background-color: rgba(0x30, 0x50, 0xff, 1); } ", -1, NULL);
+           gtk_css_provider_load_from_data(provider3, "treeview { background-color: rgba(0x60, 0x60, 0x60, 0.1); } treeview:selected { background-color: rgba(0x40, 0x60, 0xff, 1); } ", -1, NULL);
            if(shell->info_tree && shell->info_tree->view) gtk_style_context_add_provider(gtk_widget_get_style_context(shell->info_tree->view), GTK_STYLE_PROVIDER(provider3), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
            //treeviewmain
-           gtk_css_provider_load_from_data(provider3, "treeview { background-color: rgba(0x60, 0x60, 0x60, 0.1); } treeview:selected { background-color: rgba(0x30, 0x50, 0xff, 1); } ", -1, NULL);
+           gtk_css_provider_load_from_data(provider3, "treeview { background-color: rgba(0x60, 0x60, 0x60, 0.1); } treeview:selected { background-color: rgba(0x40, 0x60, 0xff, 1); } ", -1, NULL);
            if(shell->tree && shell->tree->view) gtk_style_context_add_provider(gtk_widget_get_style_context(shell->tree->view), GTK_STYLE_PROVIDER(provider3), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
        }
     } else {//disable
@@ -455,8 +455,7 @@ void cb_about()
     gtk_about_dialog_set_copyright(GTK_ABOUT_DIALOG(about), copyright);
     gtk_about_dialog_set_comments(GTK_ABOUT_DIALOG(about),
 				  _("System Information and Benchmark"));
-    gtk_about_dialog_set_logo(GTK_ABOUT_DIALOG(about),
-			      icon_cache_get_pixbuf("hardinfo2.png"));
+    gtk_about_dialog_set_logo(GTK_ABOUT_DIALOG(about), icon_cache_get_pixbuf_at_size("hardinfo2.svg", 144, 144));
 
     gtk_about_dialog_set_license(GTK_ABOUT_DIALOG(about),
 				 _("HardInfo2 is free software; you can redistribute it and/or modify "

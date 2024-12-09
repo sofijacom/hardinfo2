@@ -74,6 +74,7 @@ struct _ProgramParameters {
   gchar   *path_data;
   gchar   *path_locale;
   gchar   *argv0;
+  float   scale;
 };
 
 struct _FileTypes {
@@ -162,7 +163,7 @@ gint		h_sysfs_read_int(const gchar *endpoint, const gchar *entry);
 gint		h_sysfs_read_hex(const gchar *endpoint, const gchar *entry);
 gchar	       *h_sysfs_read_string(const gchar *endpoint, const gchar *entry);
 
-#define SCAN_START()  static gboolean scanned = FALSE; if (reload) scanned = FALSE; if (scanned) return;
+#define SCAN_START()  static gboolean scanned = FALSE; if (reload) scanned = FALSE; if (scanned) {return;} else {DEBUG("SCAN_RELOAD");}
 #define SCAN_END()    scanned = TRUE;
 
 #define _CONCAT(a,b) a ## b
@@ -215,7 +216,7 @@ gg_strescape (const gchar *source,
              const gchar *extra);
 
 /* hinote helpers */
-#define note_max_len 512
+#define note_max_len 1024
 #define note_printf(note_buff, fmt, ...)  \
     snprintf((note_buff) + strlen(note_buff), note_max_len - strlen(note_buff) - 1, \
         fmt, ##__VA_ARGS__)

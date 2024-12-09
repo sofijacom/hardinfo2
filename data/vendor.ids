@@ -107,6 +107,13 @@ name Alpine Linux
     ansi_color 0;34;107
     match_string Alpine Linux
 
+name ALT Linux
+    name_short ALT Linux
+    url www.altlinux.org
+    ansi_color 0;30;43
+    match_string altlinux
+    match_string alt linux
+
 name American Megatrends
     name_short AMI
     url www.ami.com
@@ -156,6 +163,12 @@ name Applied Micro Circuits
     match_string_case APM
     match_string_case AMCC
 
+name Astra Linux
+    name_short Astra Linux
+    url www.astralinux.ru
+    ansi_color 0;36;107
+    match_string astra linux
+
 name Arch Linux
     name_short Arch Linux
     url www.archlinux.org
@@ -174,6 +187,13 @@ name Armbian
     url www.armbian.com
     ansi_color ff;0;0
     match_string armbian
+
+name Artix Linux
+    name_short Artix Linux
+    url www.artixlinux.org
+    ansi_color 0;36;107
+    match_string artix linux
+    match_string Artix Linux
 
 name ASMedia Technology
     name_short ASMedia
@@ -477,6 +497,14 @@ name GCT Semiconductor
     match_string GCT Semiconductor
     match_string_case GCT
 
+name Gentoo Linux
+    name_short Gentoo Linux
+    ansi_color 0;34;107
+    url www.gentoo.org
+    match_string Gentoo Linux
+    match_string Gentoo
+    match_string gentoo
+
 name Gigabyte Technology
     name_short Gigabyte
     url www.gigabyte.com.tw
@@ -671,6 +699,13 @@ name LIG Nex1
     match_string LIG Nex1
     match_string LG Innotek
     match_string NEX1 Future
+
+name LiGurOS
+    name_short LiGurOS
+    url liguros.gitlab.io
+    ansi_color 0;97;42
+    match_string LiGurOS Linux
+    match_string LiGurOS
 
 name Linaro
     url linaro.org
@@ -921,6 +956,12 @@ name Parallels
     url www.parallels.com
     match_string lrpepyh vr
 
+name Parrot Security
+    name_short Parrot Security
+    url www.parrotsec.org
+    ansi_color 0;97;44
+    match_string Parrot Security
+
 name Patriot Memory
     name_short Patriot
     url www.patriotmemory.com
@@ -981,6 +1022,12 @@ name Puppy Linux
     url puppylinux-woof-ce.github.io
     ansi_color 0;31;107
     match_string Puppy Linux
+
+name postmarketOS
+    name_short postmarketOS
+    url www.postmarketos.org
+    ansi_color 0;97;42
+    match_string postmarketOS
 
 name PureOS
     name_short PureOS
@@ -1054,6 +1101,12 @@ name Renesas Electronics
     wikipedia Renesas Electronics
     ansi_color 0;97;44
     match_string Renesas
+
+name RevyOS
+    name_short RevyOS
+    url github.com/revyos/revyos
+    ansi_color 0;97;44
+    match_string RevyOS
 
 name Ricoh
     url www.ricoh.com
@@ -1460,6 +1513,13 @@ name Yamaha Corporation
     wikipedia Yamaha Corporation
     ansi_color 0;35;107
     match_string Yamaha
+
+name ZORIN OS
+    name_short ZORIN OS
+    ansi_color 0;34;107
+    url zorin.com
+    match_string ZORIN OS
+    match_string Zorin OS
 
 name ZOTAC International
     name_short ZOTAC

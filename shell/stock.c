@@ -25,15 +25,9 @@ static struct {
     gchar *filename;
     gchar *stock_id;
 } stock_icons[] = {
-    { "clipboard.png", HI_STOCK_CLIPBOARD},
-    { "refresh.png", HI_STOCK_REFRESH},
-    { "report.png", HI_STOCK_REPORT},
-    { "internet.png", HI_STOCK_INTERNET},
-    { "module.png", HI_STOCK_MODULE},
-    { "about-modules.png", HI_STOCK_ABOUT_MODULES},
-    { "server_sync.png", HI_STOCK_SYNC_MENU},
-    { "face-grin.png", HI_STOCK_DONATE},
-    { "server.png", HI_STOCK_SERVER},
+    { "refresh.svg", HI_STOCK_REFRESH},
+    { "report.svg", HI_STOCK_REPORT},
+    { "sync.svg", HI_STOCK_SYNC},
 };
 
 static GtkIconFactory *icon_factory;
@@ -48,23 +42,6 @@ void stock_icon_register(gchar * filename, gchar * stock_id)
 
     gtk_icon_source_set_pixbuf(icon_source,
 			       icon_cache_get_pixbuf(filename));
-    gtk_icon_set_add_source(icon_set, icon_source);
-    gtk_icon_source_free(icon_source);
-
-    gtk_icon_factory_add(icon_factory, stock_id, icon_set);
-
-    gtk_icon_set_unref(icon_set);
-}
-
-void stock_icon_register_pixbuf(GdkPixbuf * pixbuf, gchar * stock_id)
-{
-    GtkIconSet *icon_set;
-    GtkIconSource *icon_source;
-
-    icon_set = gtk_icon_set_new();
-    icon_source = gtk_icon_source_new();
-
-    gtk_icon_source_set_pixbuf(icon_source, pixbuf);
     gtk_icon_set_add_source(icon_set, icon_source);
     gtk_icon_source_free(icon_source);
 

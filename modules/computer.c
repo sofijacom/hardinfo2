@@ -93,23 +93,23 @@ enum {
 };
 
 static ModuleEntry entries[] = {
-    [ENTRY_SUMMARY] = {N_("Summary"), "summary.png", callback_summary, scan_summary, MODULE_FLAG_NONE},
-    [ENTRY_OS] = {N_("Operating System"), "os.png", callback_os, scan_os, MODULE_FLAG_NONE},
-    [ENTRY_SECURITY] = {N_("Security"), "security.png", callback_security, scan_security, MODULE_FLAG_NONE},
-    [ENTRY_KMOD] = {N_("Kernel Modules"), "module.png", callback_modules, scan_modules, MODULE_FLAG_NONE},
-    [ENTRY_BOOTS] = {N_("Boots"), "boot.png", callback_boots, scan_boots, MODULE_FLAG_NONE},
-    [ENTRY_LANGUAGES] = {N_("Languages"), "language.png", callback_locales, scan_locales, MODULE_FLAG_NONE},
-    [ENTRY_MEMORY_USAGE] = {N_("Memory Usage"), "memory.png", callback_memory_usage, scan_memory_usage, MODULE_FLAG_NONE},
-    [ENTRY_FS] = {N_("Filesystems"), "dev_removable.png", callback_fs, scan_fs, MODULE_FLAG_NONE},
-    [ENTRY_DISPLAY] = {N_("Display"), "monitor.png", callback_display, scan_display, MODULE_FLAG_NONE},
-    [ENTRY_ENV] = {N_("Environment Variables"), "environment.png", callback_env_var, scan_env_var, MODULE_FLAG_NONE},
+    [ENTRY_SUMMARY] = {N_("Summary"), "summary.svg", callback_summary, scan_summary, MODULE_FLAG_NONE},
+    [ENTRY_OS] = {N_("Operating System"), "os.svg", callback_os, scan_os, MODULE_FLAG_NONE},
+    [ENTRY_SECURITY] = {N_("Security"), "security.svg", callback_security, scan_security, MODULE_FLAG_NONE},
+    [ENTRY_KMOD] = {N_("Kernel Modules"), "module.svg", callback_modules, scan_modules, MODULE_FLAG_NONE},
+    [ENTRY_BOOTS] = {N_("Boots"), "boot.svg", callback_boots, scan_boots, MODULE_FLAG_NONE},
+    [ENTRY_LANGUAGES] = {N_("Languages"), "language.svg", callback_locales, scan_locales, MODULE_FLAG_NONE},
+    [ENTRY_MEMORY_USAGE] = {N_("Memory Usage"), "memory.svg", callback_memory_usage, scan_memory_usage, MODULE_FLAG_NONE},
+    [ENTRY_FS] = {N_("Filesystems"), "filesystem.svg", callback_fs, scan_fs, MODULE_FLAG_NONE},
+    [ENTRY_DISPLAY] = {N_("Display"), "monitor.svg", callback_display, scan_display, MODULE_FLAG_NONE},
+    [ENTRY_ENV] = {N_("Environment Variables"), "environment.svg", callback_env_var, scan_env_var, MODULE_FLAG_NONE},
 #if GLIB_CHECK_VERSION(2,14,0)
-    [ENTRY_DEVEL] = {N_("Development"), "devel.png", callback_dev, scan_dev, MODULE_FLAG_NONE},
+    [ENTRY_DEVEL] = {N_("Development"), "devel.svg", callback_dev, scan_dev, MODULE_FLAG_NONE},
 #else
-    [ENTRY_DEVEL] = {N_("Development"), "devel.png", callback_dev, scan_dev, MODULE_FLAG_HIDE},
+    [ENTRY_DEVEL] = {N_("Development"), "devel.svg", callback_dev, scan_dev, MODULE_FLAG_HIDE},
 #endif /* GLIB_CHECK_VERSION(2,14,0) */
-    [ENTRY_USERS] = {N_("Users"), "users.png", callback_users, scan_users, MODULE_FLAG_NONE},
-    [ENTRY_GROUPS] = {N_("Groups"), "users.png", callback_groups, scan_groups, MODULE_FLAG_NONE},
+    [ENTRY_USERS] = {N_("Users"), "users.svg", callback_users, scan_users, MODULE_FLAG_NONE},
+    [ENTRY_GROUPS] = {N_("Groups"), "users.svg", callback_groups, scan_groups, MODULE_FLAG_NONE},
     {NULL},
 };
 
@@ -386,11 +386,56 @@ gchar *callback_memory_usage()
                lginterval);
 }
 
-static gchar *detect_machine_type(int english)
+
+gchar *computer_get_machinetype(int english)
 {
+    gchar *tmp;
     GDir *dir;
     gchar *chassis;
 
+    if(g_file_test("/proc/xen", G_FILE_TEST_EXISTS)) {
+        DEBUG("/proc/xen found; assuming Xen");
+	if(english)
+            return g_strdup(N_("Virtual (Xen)"));
+	else
+            return g_strdup(_("Virtual (Xen)"));
+    }
+
+    tmp = module_call_method("devices::getMotherboard");
+    if(strstr(tmp, "VirtualBox") != NULL) {
+        g_free(tmp);
+	if(english)
+            return g_strdup(N_("Virtual (VirtualBox)"));
+        else
+            return g_strdup(_("Virtual (VirtualBox)"));
+    }
+    if(strstr(tmp, "VMware") != NULL) {
+        g_free(tmp);
+	if(english)
+            return g_strdup(N_("Virtual (VMware)"));
+	else
+            return g_strdup(_("Virtual (VMware)"));
+    }
+    g_free(tmp);
+
+    tmp = module_call_method("devices::getStorageDevices");
+    if((strstr(tmp, "QEMU") != NULL) || (strstr(tmp, "VirtIO") != NULL)) {
+        g_free(tmp);
+	if(english)
+            return g_strdup(N_("Virtual (QEMU)"));
+	else
+            return g_strdup(_("Virtual (QEMU)"));
+    }
+    g_free(tmp);
+
+    tmp=module_call_method("computer::getOSKernel");
+    if(strstr(tmp,"WSL2")){
+         g_free(tmp);
+         return g_strdup("Virtual (WSL2)");
+    }
+    g_free(tmp);
+
+    //Physical machine
     chassis = dmi_chassis_type_str(-1, 0);
     if (chassis)
         return chassis;
@@ -449,126 +494,12 @@ static gchar *detect_machine_type(int english)
         g_dir_close(dir);
     }
 
-    if(strstr(module_call_method("computer::getOSKernel"),"WSL2"))
-        return g_strdup("WSL2");
     if(english)
         return g_strdup(N_("Unknown physical machine type"));
     else
         return g_strdup(_("Unknown physical machine type"));
 }
 
-/* Table based off imvirt by Thomas Liske <liske@ibh.de>
-   Copyright (c) 2008 IBH IT-Service GmbH under GPLv2. */
-char get_virtualization[100]={};
-char get_virtualization_english[100]={};
-gchar *computer_get_virtualization(int english)
-{
-    gboolean found = FALSE;
-    gint i, j;
-    gchar *files[] = {
-        "/proc/scsi/scsi",
-        "/proc/cpuinfo",
-        "/var/log/dmesg",
-        NULL
-    };
-    static const struct {
-        gchar *str;
-        gchar *vmtype;
-    } vm_types[] = {
-        /* VMware */
-        { "VMware", N_("Virtual (VMware)") },
-        { ": VMware Virtual IDE CDROM Drive", N_("Virtual (VMware)") },
-        /* QEMU */
-        { "QEMU", N_("Virtual (QEMU)") },
-        { "QEMU Virtual CPU", N_("Virtual (QEMU)") },
-        { ": QEMU HARDDISK", N_("Virtual (QEMU)") },
-        { ": QEMU CD-ROM", N_("Virtual (QEMU)") },
-        /* Generic Virtual Machine */
-        { ": Virtual HD,", N_("Virtual (Unknown)") },
-        { ": Virtual CD,", N_("Virtual (Unknown)") },
-        /* Virtual Box */
-        { "VBOX", N_("Virtual (VirtualBox)") },
-        { ": VBOX HARDDISK", N_("Virtual (VirtualBox)") },
-        { ": VBOX CD-ROM", N_("Virtual (VirtualBox)") },
-        /* Xen */
-        { "Xen virtual console", N_("Virtual (Xen)") },
-        { "Xen reported: ", N_("Virtual (Xen)") },
-        { "xen-vbd: registered block device", N_("Virtual (Xen)") },
-        /* Generic */
-        { " hypervisor", N_("Virtual (hypervisor present)") } ,
-        { NULL }
-    };
-    gchar *tmp;
-    //Caching for speedup
-    if((get_virtualization[0]!=0) && (english==0)) return g_strdup(get_virtualization);
-    if((get_virtualization_english[0]!=0) && (english==1)) return g_strdup(get_virtualization_english);
-
-    DEBUG("Detecting virtual machine");
-
-    if (g_file_test("/proc/xen", G_FILE_TEST_EXISTS)) {
-         DEBUG("/proc/xen found; assuming Xen");
-	 if(english)
-             return g_strdup(N_("Virtual (Xen)"));
-	 else
-             return g_strdup(_("Virtual (Xen)"));
-    }
-
-    tmp = module_call_method("devices::getMotherboard");
-    if (strstr(tmp, "VirtualBox") != NULL) {
-        g_free(tmp);
-	if(english)
-            return g_strdup(N_("Virtual (VirtualBox)"));
-        else
-            return g_strdup(_("Virtual (VirtualBox)"));
-    }
-    if (strstr(tmp, "VMware") != NULL) {
-        g_free(tmp);
-	if(english)
-            return g_strdup(N_("Virtual (VMware)"));
-	else
-            return g_strdup(_("Virtual (VMware)"));
-    }
-    g_free(tmp);
-
-    for (i = 0; files[i+1]; i++) {
-         gchar buffer[512];
-         FILE *file;
-
-         if ((file = fopen(files[i], "r"))) {
-              while (!found && fgets(buffer, 512, file)) {
-                  for (j = 0; vm_types[j+1].str; j++) {
-                      if (strstr(buffer, vm_types[j].str)) {
-                         found = TRUE;
-                         break;
-                      }
-                  }
-              }
-
-              fclose(file);
-
-              if (found) {
-                  DEBUG("%s found (by reading file %s)", vm_types[j].vmtype, files[i]);
-		  if(!english) strcpy(get_virtualization,_(vm_types[j].vmtype));//Save
-		  if(english) strcpy(get_virtualization_english,_(vm_types[j].vmtype));//Save
-		  if(english)
-                      return g_strdup(N_(vm_types[j].vmtype));
-		  else
-                      return g_strdup(_(vm_types[j].vmtype));
-              }
-         }
-
-    }
-
-    DEBUG("no virtual machine detected; assuming physical machine");
-    gchar *c=detect_machine_type(english);
-    if(!english) strcpy(get_virtualization,c);//Save
-    if(english) strcpy(get_virtualization_english,c);//Save
-    g_free(c);
-    if(english)
-       return g_strdup(get_virtualization_english);
-    else
-       return g_strdup(get_virtualization);
-}
 
 gchar *callback_summary(void)
 {
@@ -581,7 +512,7 @@ gchar *callback_summary(void)
             idle_free(module_call_method("devices::getProcessorNameAndDesc"))),
         info_field_update(_("Memory"), 1000),
         info_field_printf(_("Machine Type"), "%s",
-            computer_get_virtualization(0)),
+            computer_get_machinetype(0)),
         info_field(_("Operating System"), computer->os->distro),
         info_field(_("User Name"), computer->os->username),
         info_field_update(_("Date/Time"), 1000),
@@ -1021,19 +952,12 @@ gchar *get_memory_total(void)
     return moreinfo_lookup ("DEV:MemTotal");
 }
 
-gchar *memory_devices_get_system_memory_str(); /* in dmi_memory.c */
-gchar *memory_devices_get_system_memory_types_str();
-/* Note 1: moreinfo_lookup() results should not be freed because
- *         they are pointers into a GHash.
- *         module_call_method() g_strdup()s it's return value. */
-const gchar *get_memory_desc(void) // [1] const (as to say "don't free")
+gchar *get_memory_desc(void)
 {
-    scan_memory_usage(FALSE);
-    gchar *avail = g_strdup(moreinfo_lookup("DEV:MemTotal")); // [1] g_strdup()
+    gchar *avail = g_strdup(get_memory_total());
     double k = avail ? (double)strtol(avail, NULL, 10) : 0;
     if (k) {
-        g_free(avail);
-        avail = NULL;
+        g_free(avail);avail = NULL;
         const char *fmt = _(/*/ <value> <unit> "usable memory" */ "%0.1f %s available to Linux");
         if (k > (2048 * 1024))
             avail = g_strdup_printf(fmt, k / (1024*1024), _("GiB") );
@@ -1042,26 +966,25 @@ const gchar *get_memory_desc(void) // [1] const (as to say "don't free")
         else
             avail = g_strdup_printf(fmt, k, _("KiB") );
     }
-    gchar *mem = memory_devices_get_system_memory_str();
+    //
+    gchar *mem = module_call_method("devices::getMemDesc");
     if (mem) {
-        gchar *types = memory_devices_get_system_memory_types_str();
-        gchar *ret = g_strdup_printf("%s %s\n%s", mem, types, avail ? avail : "");
+    gchar *ret = g_strdup_printf("%s\n%s", mem, (avail ? avail : ""));
         g_free(avail);
         g_free(mem);
-        g_free(types);
-        return (gchar*)idle_free(ret); // [1] idle_free()
+        return ret;
     }
-    return (gchar*)idle_free(avail); // [1] idle_free()
+    return avail;
 }
 
 static gchar *get_machine_type(void)
 {
-    return computer_get_virtualization(0);
+    return computer_get_machinetype(0);
 }
 
 static gchar *get_machine_type_english(void)
 {
-    return computer_get_virtualization(1);
+    return computer_get_machinetype(1);
 }
 
 const ShellModuleMethod *hi_exported_methods(void)
@@ -1111,34 +1034,34 @@ gchar **hi_module_get_dependencies(void)
 
 gchar *hi_module_get_summary(void)
 {
-    gchar *virt = computer_get_virtualization(0);
+    gchar *virt = computer_get_machinetype(0);
     gchar *machine_type = g_strdup_printf("%s (%s)",
                                           _("Motherboard"),
                                           (char*)idle_free(virt));
 
     return g_strdup_printf("[%s]\n"
-                    "Icon=os.png\n"
+                    "Icon=os.svg\n"
                     "Method=computer::getOSshort\n"
                     "[%s]\n"
-                    "Icon=processor.png\n"
+                    "Icon=processor.svg\n"
                     "Method=devices::getProcessorNameAndDesc\n"
                     "[%s]\n"
-                    "Icon=memory.png\n"
+                    "Icon=memory.svg\n"
                     "Method=computer::getMemoryDesc\n"
                     "[%s]\n"
-                    "Icon=module.png\n"
+                    "Icon=mb.svg\n"
                     "Method=devices::getMotherboard\n"
                     "[%s]\n"
-                    "Icon=monitor.png\n"
+                    "Icon=monitor.svg\n"
                     "Method=computer::getDisplaySummary\n"
                     "[%s]\n"
-                    "Icon=hdd.png\n"
+                    "Icon=hdd.svg\n"
                     "Method=devices::getStorageDevicesSimple\n"
                     "[%s]\n"
-                    "Icon=printer.png\n"
+                    "Icon=printer.svg\n"
                     "Method=devices::getPrinters\n"
                     "[%s]\n"
-                    "Icon=audio.png\n"
+                    "Icon=audio.svg\n"
                     "Method=computer::getAudioCards\n",
                     _("Operating System"),
                     _("Processor"), _("Memory"), (char*)idle_free(machine_type), _("Graphics"),

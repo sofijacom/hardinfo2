@@ -24,23 +24,44 @@
 
 #define UNKIFNULL_AC(f) (f != NULL) ? f : _("(Unknown)");
 
+/*See https://admin.pci-ids.ucw.cz/read/PD */
 static const struct {
     const gchar *icon;
     uint32_t class;
 } class2icon[] = {
-    { .class = 0x0200, .icon = "network-interface.png" },
-    { .class = 0x0c03, .icon = "usb.png" },
-    { .class = 0x0403, .icon = "audio.png" },
-    { .class = 0x0805, .icon = "usbfldisk.png" },
-    { .class = 0x0d11, .icon = "bluetooth.png" },
-    { .class = 0x0703, .icon = "modem.png" },
-    { .class = 0x01, .icon = "hdd.png" },
-    { .class = 0x02, .icon = "network.png" },
-    { .class = 0x03, .icon = "monitor.png" },
-    { .class = 0x05, .icon = "memory.png" },
-    { .class = 0x07, .icon = "network-connections.png" },
-    { .class = 0x09, .icon = "inputdevices.png" },
-    { .class = 0x10, .icon = "cryptohash.png" },
+    { .class = 0x0102, .icon = "media-floppy.svg" },
+    { .class = 0x0200, .icon = "network-interface.svg" },
+    { .class = 0x0c03, .icon = "usb.svg" },
+    { .class = 0x0c80, .icon = "usb.svg" },
+    { .class = 0x0400, .icon = "gpu.svg" },
+    { .class = 0x0402, .icon = "modem.svg" },
+    { .class = 0x0403, .icon = "audio.svg" },
+    { .class = 0x0805, .icon = "media-sd.svg" },
+    { .class = 0x0d11, .icon = "bluetooth.svg" },
+    { .class = 0x0703, .icon = "modem.svg" },
+    { .class = 0x0900, .icon = "keyboard.svg" },
+    { .class = 0x0902, .icon = "mouse.svg" },
+    { .class = 0x0904, .icon = "joystick.svg" },
+    { .class = 0x01, .icon = "hdd.svg" },
+    { .class = 0x02, .icon = "network.svg" },
+    { .class = 0x03, .icon = "monitor.svg" },
+    { .class = 0x04, .icon = "audio.svg" },
+    { .class = 0x05, .icon = "memory.svg" },
+    /*{ .class = 0x05, .icon = "pcibridge.svg" },*/
+    { .class = 0x07, .icon = "network-connections.svg" },
+    /*{ .class = 0x08, .icon = "pcisystem.svg" },*/
+    { .class = 0x09, .icon = "inputdevices.svg" },
+    /*{ .class = 0x0a, .icon = "docking.svg" },*/
+    { .class = 0x0b, .icon = "processor.svg" },
+    /*{ .class = 0x0c, .icon = "serial.svg" },*/
+    { .class = 0x0d, .icon = "wireless.svg" },
+    /*{ .class = 0x0e, .icon = "intelligent.svg" },*/
+    /*{ .class = 0x0f, .icon = "satellite.svg" },*/
+    { .class = 0x10, .icon = "cryptohash.svg" },
+    /*{ .class = 0x11, .icon = "dsp.svg" },*/
+    /*{ .class = 0x12, .icon = "fpga.svg" },*/
+    /*{ .class = 0x13, .icon = "instrumentation.svg" },*/
+    /*{ .class = 0x40, .icon = "coprocessor.svg" },*/
 };
 
 static const gchar *find_icon_for_class(uint32_t class)
@@ -56,7 +77,7 @@ static const gchar *find_icon_for_class(uint32_t class)
 	}
     }
 
-    return "devices.png";
+    return "pci.svg";
 }
 
 static gchar *_pci_dev(const pcid *p, gchar *icons) {

@@ -44,11 +44,13 @@ static const AptFlavor apt_flavors[] = {
     { "Kubuntu",        "kubuntu",         "kubuntu-desktop",          "/etc/os-release",            "VERSION_ID=" },
     { "Lubuntu",        "lubuntu",         "lubuntu-desktop",          "/etc/os-release",            "VERSION_ID=" },
     { "Edubuntu",       "edubuntu",        "edubuntu-desktop",         "/etc/os-release",            "VERSION_ID=" },
+    { "Parrot Security","parrot",          "parrot-updater",           "/etc/os-release",            "VERSION_ID=" },
     { "Bodhi Linux",    "bodhi",           "bodhi-appcenter",          "/etc/bodhi/info",            "RELEASE=" },
     { "MX Linux",       "mxlinux",         "mx-welcome",               "/etc/mx-version",            "MX-" },
     { "Raspbian",       "raspbian",        "raspbian-archive-keyring", "/etc/os-release",            "VERSION_ID=" },
     { "Armbian",        "armbian",         "armbian-config",           "/etc/armbian-image-release", "VERSION=" },
     { "Raspberry Pi",   "raspberry-pi",    "rpi-update",               "/etc/os-release",            "VERSION_ID=" },
+    { "RevyOS",         "revyos",          "revyos-keyring",           "/etc/revyos-release",        "BUILD_ID=" },
     { "PureOS",         "pureos",          "pureos-settings",          "/etc/os-release",            "VERSION_ID=" },
     { "Puppy Linux",    "puppy",           "/etc/DISTRO_SPECS",        "/etc/DISTRO_SPECS",          "DISTRO_VERSION=" },
     { "Ubuntu GNOME",   "ubuntu-gnome",    "ubuntu-gnome-desktop",     "/etc/os-release",            "VERSION_ID=" },//dead
@@ -304,7 +306,7 @@ desktop_with_session_type(const gchar *desktop_env)
     tmp = g_getenv("XDG_SESSION_TYPE");
     if (tmp) {
         if (!g_str_equal(tmp, "unspecified"))
-            return g_strdup_printf(_(/*/{desktop environment} on {session type}*/ "%s on %s"), desktop_env, tmp);
+            return g_strdup_printf(_(/*!/{desktop environment} on {session type}*/ "%s on %s"), desktop_env, tmp);
     }
 
     return g_strdup(desktop_env);
@@ -416,10 +418,10 @@ gchar *computer_get_aslr(void)
 gchar *computer_get_entropy_avail(void)
 {
     gchar tab_entropy_fstr[][32] = {
-      N_(/*/bits of entropy for rng (0)*/              "(None or not available)"),
-      N_(/*/bits of entropy for rng (low/poor value)*/  "%d bits (low)"),
-      N_(/*/bits of entropy for rng (medium value)*/    "%d bits (medium)"),
-      N_(/*/bits of entropy for rng (high/good value)*/ "%d bits (healthy)")
+      N_(/*!/bits of entropy for rng (0)*/              "(None or not available)"),
+      N_(/*!/bits of entropy for rng (low/poor value)*/  "%d bits (low)"),
+      N_(/*!/bits of entropy for rng (medium value)*/    "%d bits (medium)"),
+      N_(/*!/bits of entropy for rng (high/good value)*/ "%d bits (healthy)")
     };
     gint bits = h_sysfs_read_int("/proc/sys/kernel/random", "entropy_avail");
     if (bits > 3000) return g_strdup_printf(_(tab_entropy_fstr[3]), bits);
@@ -523,6 +525,10 @@ static Distro parse_os_release(void)
 	contents=id;
         id=strreplace(id,"\n","");
         g_free(contents);
+	//
+	contents=id;
+        id=strreplace(id," ","");
+        g_free(contents);
         if(strlen(id)<1) {g_free(id);id=NULL;}
     }
     if(version){
@@ -539,11 +545,24 @@ static Distro parse_os_release(void)
     //remove codename from pretty name
     if(pretty_name && codename){
         gchar *t;
+	//upper first letter
+	t=g_strdup_printf(" (%s)",codename);
+	t[2]=toupper(t[2]);
+	contents=pretty_name;
+        pretty_name=strreplace(contents,t,"");
+	g_free(t);g_free(contents);
+	//normal
 	t=g_strdup_printf(" (%s)",codename);
 	contents=pretty_name;
         pretty_name=strreplace(contents,t,"");
 	g_free(t);g_free(contents);
-	//
+	//without brackets upper first letter
+	t=g_strdup_printf(" %s",codename);
+	t[1]=toupper(t[1]);
+	contents=pretty_name;
+        pretty_name=strreplace(contents,t,"");
+	g_free(t);g_free(contents);
+	//without brackets normal
 	t=g_strdup_printf(" %s",codename);
 	contents=pretty_name;
         pretty_name=strreplace(contents,t,"");
@@ -551,6 +570,14 @@ static Distro parse_os_release(void)
 	g_strstrip(pretty_name);
     }
 
+    //Based on Alpine Linux add to distro string
+    if(pretty_name && !g_str_equal(id, "alpine")  && g_file_get_contents("/etc/alpine-release", &contents , NULL, NULL) ) {
+        gchar *t,*p=contents;
+        while(*p && ((*p>'9') || (*p<'0'))) p++;
+        if(p) strend(p,' '); else p="";
+        t=pretty_name; pretty_name=g_strdup_printf("%s - Alpine %s", t,p); g_free(t);
+        g_free(contents);
+    } else
     //Based on Fedora Linux add to distro string
     if(pretty_name && !g_str_equal(id, "fedora")  && g_file_get_contents("/etc/fedora-release", &contents , NULL, NULL) ) {
         gchar *t,*p=contents;
