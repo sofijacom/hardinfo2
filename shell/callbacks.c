@@ -33,6 +33,10 @@
 
 #include "config.h"
 
+void cb_update()
+{
+    cb_open_updates_page();
+}
 void cb_sync_manager()
 {
     Shell *shell = shell_get_main_shell();
@@ -264,6 +268,34 @@ void cb_open_web_page()
 {
     uri_open("https://www.hardinfo2.org");
 }
+void cb_open_help_page()
+{
+    uri_open("https://www.hardinfo2.org/userguide#gui");
+}
+void cb_open_updates_page()
+{
+    gchar *cmd_line, *err=NULL, *arch=NULL, *url, *distro=NULL;
+    gboolean spawned;
+
+    cmd_line=g_strdup("sh -c 'LC_ALL=C uname -m'");
+    spawned = g_spawn_command_line_sync(cmd_line, &arch, &err, NULL, NULL);
+    g_free(cmd_line);
+    if (!spawned || strlen(arch)<1) {
+      if(arch) g_free(arch);
+      arch=g_strdup(HARDINFO2_ARCH);
+    }
+    if(!arch) arch=strdup("err");
+    if(err) g_free(err);
+    
+    distro=module_call_method("computer::getOSshort");
+    
+    url=g_strconcat("https://www.hardinfo2.org/updates?ver=",VERSION,"&arch=",arch,"&distro=",distro,NULL);
+    g_free(arch);g_free(distro);
+    
+    uri_open(url);
+    
+    g_free(url);
+}
 
 void cb_report_bug()
 {
@@ -368,20 +400,25 @@ void cb_about()
         "Vendor list based on GtkSysInfo by Pissens Sebastien",
         "DMI support based on code by Stewart Adam",
         "SCSI support based on code by Pascal F. Martin",
-	"OpenGL benchmark based on code by Zack Rusin",
-	"OpenGL benchmark based on code by David Reveman",
-	"OpenGL benchmark based on code by Peter Nilsson",
+	"OpenGL code by Zack Rusin,David Reveman,Peter Nilsson",
+	"Vulkan code by Collabora Ltd",
 	"",
 	"Translated by:",
 	"Alexander Münch",
 	"micrococo",
-	"yolanteng0",
 	"Yunji Lee",
 	"Hugo Carvalho",
 	"Paulo Giovanni Pereira",
 	"Sergey Rodin",
 	"Sabri Ünal",
 	"yetist",
+	"ViBE (Hungarian)",
+	"hwspeedy (Danish)",
+	"tutralex (Russian)",
+	"thiagodalsoto (Brazilian)",
+	"serkan-maker (Turkish)",
+	"ReVe1uv (Chinese)",
+	"yolateng0 (France)",
         "",
 	"Artwork by:",
         "Jakub Szypulka",
@@ -405,10 +442,12 @@ void cb_about()
 	"AngryPenguinPL (OpenMandriva)",
 	"quincyf467 (Gentoo)",
 	"terryn94 (PCLinuxOS)",
-	"bjornfor (NixOS+NIX packages)",
+	"sigmanificient (NixOS+NIX packages)",
 	"DidierSpaier (Slint)",
 	"B. Watson (Slackbuild packages)",
 	"K1ngfish3r (Clear Linux)",
+	"adamthiede (Alpine branches)",
+	"k0tran+glinkinvd (Alt Linux branches)",
 	"",
         NULL
     };
@@ -422,7 +461,7 @@ void cb_about()
     gtk_about_dialog_set_name(GTK_ABOUT_DIALOG(about), "Hardinfo2");
 #endif
 
-    copyright = g_strdup_printf("Copyright \302\251 2003-2023 L. A. F. Pereira\nCopyright \302\251 2024-%d Hardinfo2 Project\n\n\n\n", HARDINFO2_COPYRIGHT_LATEST_YEAR);
+    copyright = g_strdup_printf("Copyright \302\251 2003-2023 L. A. F. Pereira\nCopyright \302\251 2024-%d Hardinfo2 Project\n\n\n\n", RELEASE_YEAR);
 
     path = g_build_filename(g_get_user_config_dir(), "hardinfo2","blobs-update-version.json", NULL);
     fd = open(path,O_RDONLY);
@@ -494,9 +533,8 @@ void cb_generate_report()
 
 void cb_quit(void)
 {
-    do {
+    //do {
 	gtk_main_quit();
-    } while (gtk_main_level() > 1);
-
-    exit(0);
+    //} while (gtk_main_level() > 1);
+    //exit(0);
 }

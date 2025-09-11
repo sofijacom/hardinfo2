@@ -692,7 +692,7 @@ gchar *dmi_socket_info() {
                 _("Socket Information"), _("Result"),
                 (getuid() == 0)
                 ? _("(Not available)")
-                : _("(Not available; Perhaps try running hardinfo2 as root.)") );
+                : _("(Not available)") );
     } else {
         ret = g_strdup("");
         for(i = 0; i < hl->count; i++) {
@@ -736,6 +736,7 @@ gchar *processor_meta(GSList * processors) {
     gchar *meta_freq_desc = processor_frequency_desc(processors);
     gchar *meta_clocks = clocks_summary(processors);
     gchar *meta_caches = caches_summary(processors);
+    gchar *meta_hwcaps = ldlinux_hwcaps_info();
     gchar *meta_dmi = dmi_socket_info();
     gchar *ret = NULL;
     UNKIFNULL(meta_cpu_desc);
@@ -745,16 +746,19 @@ gchar *processor_meta(GSList * processors) {
                         "%s=%s\n"
                         "%s"
                         "%s"
+                        "%s"
                         "%s",
                         _("Package Information"),
                         _("Name"), meta_cpu_name,
                         _("Topology"), meta_cpu_desc,
                         _("Logical CPU Config"), meta_freq_desc,
+                        meta_hwcaps,
                         meta_clocks,
                         meta_caches,
                         meta_dmi);
     g_free(meta_cpu_desc);
     g_free(meta_freq_desc);
+    g_free(meta_hwcaps);
     g_free(meta_clocks);
     g_free(meta_caches);
     return ret;

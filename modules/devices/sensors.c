@@ -563,6 +563,49 @@ static void read_sensors_sys_thermal(void) {
     }
 }
 
+
+static void read_sensors_cpufreq(void) {
+    const gchar *path = "/proc/cpuinfo";
+    gchar *contents,*cpupath;
+    int cpuid=0;
+
+    cpupath=g_strdup_printf("/sys/devices/system/cpu/cpu%d/cpufreq/scaling_cur_freq",cpuid);
+    while(g_file_get_contents(cpupath, &contents, NULL, NULL)) {
+        int freq;
+	gchar *cpuid_str;
+	if(contents && (sscanf(contents, "%d", &freq)==1)) {
+            cpuid_str=g_strdup_printf("cpu%d",cpuid);
+
+	    add_sensor("CPU Frequency", cpuid_str, "cpufreq", (float)freq/1000, " MHz", "processor");
+
+	    cpuid++;
+	    g_free(cpuid_str);
+	}
+	g_free(contents);
+	g_free(cpupath);
+	cpupath=g_strdup_printf("/sys/devices/system/cpu/cpu%d/cpufreq/scaling_cur_freq",cpuid);
+    }
+    g_free(cpupath);
+
+    if (!cpuid && g_file_get_contents(path, &contents, NULL, NULL)) {
+        float freq;
+	gchar *p,*cpuid_str;
+
+	p=strstr(contents,"cpu MHz");
+
+	while(p && (sscanf(p, "cpu MHz%*[ \t]: %f", &freq)==1)) {
+            cpuid_str=g_strdup_printf("cpu%d",cpuid);
+
+	    add_sensor("CPU Frequency", cpuid_str, "core", freq, " MHz", "processor");
+
+	    cpuid++;
+	    g_free(cpuid_str);
+	    p=strstr(p+7,"cpu MHz");
+	}
+	g_free(contents);
+    }
+}
+
 static void read_sensors_omnibook(void) {
     const gchar *path_ob = "/proc/omnibook/temperature";
     gchar *contents;
@@ -580,48 +623,6 @@ static void read_sensors_omnibook(void) {
                    "therm");
 
         g_free(contents);
-    }
-}
-
-static void read_sensors_hddtemp(void) {
-    Socket *s;
-    gchar buffer[1024];
-    gint len = 0;
-
-    if (!(s = sock_connect("127.0.0.1", 7634)))
-        return;
-
-    while (!len)
-        len = sock_read(s, buffer, sizeof(buffer));
-    sock_close(s);
-
-    if (len > 2 && buffer[0] == '|' && buffer[1] == '/') {
-        gchar **disks;
-        int i;
-
-        disks = g_strsplit(buffer, "||", 0);
-        for (i = 0; disks[i]; i++) {
-            gchar **fields = g_strsplit(disks[i] + 1, "|", 5);
-
-            /*
-             * 0 -> /dev/hda
-             * 1 -> FUJITSU MHV2080AH
-             * 2 -> 41
-             * 3 -> C
-             */
-            const gchar *unit = strcmp(fields[3], "C")
-                ? "\302\260F" : "\302\260C";
-            add_sensor("Drive Temperature",
-                       fields[1],
-                       "hddtemp",
-                       atoi(fields[2]),
-                       unit,
-                       "therm");
-
-            g_strfreev(fields);
-        }
-
-        g_strfreev(disks);
     }
 }
 
@@ -743,8 +744,8 @@ void scan_sensors_do(void) {
         read_sensors_omnibook();
     }
 
+    read_sensors_cpufreq();
     read_sensors_windfarm();
-    read_sensors_hddtemp();
     read_sensors_udisks2();
 }
 

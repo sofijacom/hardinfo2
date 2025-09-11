@@ -52,6 +52,11 @@ static GtkActionEntry entries[] = {
      N_("Send benchmark results and receive updated data from the network"),
      G_CALLBACK(cb_sync_manager)},
 
+    {"UpdateAction", HI_STOCK_UPDATES,
+     N_("Update Available"), "",
+     N_("Update Available"),
+     G_CALLBACK(cb_update)},
+
     //does not work correctly and value low
     /*{"CopyAction", HI_STOCK_CLIPBOARD,
      N_("_Copy to Clipboard"), "<control>C",
@@ -64,9 +69,19 @@ static GtkActionEntry entries[] = {
      G_CALLBACK(cb_refresh)},
 
     {"HomePageAction", NULL,
-     N_("_Open HardInfo2 Web Site"), NULL,
+     N_("HardInfo2 _Web Site"), "<control>W",
      NULL,
      G_CALLBACK(cb_open_web_page)},
+
+    {"HelpPageAction", NULL,
+     N_("_Help - User Guide"), "<control>H",
+     NULL,
+     G_CALLBACK(cb_open_help_page)},
+
+    {"UpdatesPageAction", NULL,
+     N_("_Update HardInfo2"), "",
+     NULL,
+     G_CALLBACK(cb_open_updates_page)},
 
     {"ReportBugAction", NULL,
      N_("_Report bug"), NULL,
@@ -220,6 +235,10 @@ void menu_init(Shell * shell)
     gtk_image_menu_item_set_image(t,icon_cache_get_image_at_size("refresh.svg",size,size));
     t=GTK_IMAGE_MENU_ITEM(gtk_ui_manager_get_widget(shell->ui_manager, "/MainMenu/HelpMenu/WebPage"));
     gtk_image_menu_item_set_image(t,icon_cache_get_image_at_size("home.svg",size,size));
+    t=GTK_IMAGE_MENU_ITEM(gtk_ui_manager_get_widget(shell->ui_manager, "/MainMenu/HelpMenu/HelpPage"));
+    gtk_image_menu_item_set_image(t,icon_cache_get_image_at_size("help.svg",size,size));
+    t=GTK_IMAGE_MENU_ITEM(gtk_ui_manager_get_widget(shell->ui_manager, "/MainMenu/HelpMenu/UpdatesPage"));
+    gtk_image_menu_item_set_image(t,icon_cache_get_image_at_size("updates.svg",size,size));
     t=GTK_IMAGE_MENU_ITEM(gtk_ui_manager_get_widget(shell->ui_manager, "/MainMenu/HelpMenu/ReportBug"));
     gtk_image_menu_item_set_image(t,icon_cache_get_image_at_size("report-bug.svg",size,size));
     t=GTK_IMAGE_MENU_ITEM(gtk_ui_manager_get_widget(shell->ui_manager, "/MainMenu/HelpMenu/About"));

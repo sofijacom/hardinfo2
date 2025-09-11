@@ -2,6 +2,9 @@
 #define __CONFIG_H__
 
 #define VERSION			"@HARDINFO2_VERSION@"
+#define RELEASE_YEAR		@HARDINFO2_RELEASE_YEAR@
+
+#define HARDINFO2_ARCH		"@HARDINFO2_ARCH@"
 
 #define ARCH			"ARCH_@HARDINFO2_ARCH@"
 #define OS			"@HARDINFO2_OS@"
@@ -9,6 +12,7 @@
 #define KERNEL			""
 #define HOSTNAME		""
 #define ARCH_@HARDINFO2_ARCH@
+#define PACK_REQ		"@PACK_REQ@"
 
 #define LIBDIR			"@CMAKE_INSTALL_LIBDIR@"
 #define LIBPREFIX		"@CMAKE_INSTALL_FULL_LIBDIR@/hardinfo2"
@@ -18,6 +22,10 @@
 #cmakedefine CMAKE_BUILD_TYPE 	@CMAKE_BUILD_TYPE@
 #cmakedefine HARDINFO2_LIBSOUP3 @HARDINFO2_LIBSOUP3@
 #cmakedefine HARDINFO2_QT5      @HARDINFO2_QT5@
+#cmakedefine HARDINFO2_VK       @HARDINFO2_VK@
+#cmakedefine HARDINFO2_VK_WAYLAND @HARDINFO2_VK_WAYLAND@
+#cmakedefine HARDINFO2_VK_X11   @HARDINFO2_VK_X11@
+#cmakedefine HARDINFO2_NOSSL    @HARDINFO2_NOSSL@
 
 #define Release 1
 #define ON 1

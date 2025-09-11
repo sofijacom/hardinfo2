@@ -72,9 +72,14 @@ static GQuark err_quark;
 static guint server_blobs_update_version = 0;
 static guint our_blobs_update_version = 0;
 
-//Note there are no personal information involved and very old
-//linux systems does not work with HTTPS so use HTTP for now
+//Note there are no personal information involved
+//Very old linux systems does not work with HTTPS
+//But it is the standard and should be used in new distros
+#if(HARDINFO2_NOSSL)
 #define API_SERVER_URI "http://api.hardinfo2.org"
+#else
+#define API_SERVER_URI "https://api.hardinfo2.org"
+#endif
 
 #define LABEL_SYNC_DEFAULT                                                     \
     _("<big><b>Synchronize with Central Database</b></big>\n"                  \
@@ -109,7 +114,7 @@ gint sync_manager_count_entries(void)
 
 void sync_manager_add_entry(SyncEntry *entry)
 {
-    DEBUG("registering syncmanager entry ''%s''", entry->name);
+    //DEBUG("registering syncmanager entry ''%s''", entry->name);
 
     entry->selected = TRUE;
     entries = g_slist_append(entries, entry);
@@ -117,7 +122,7 @@ void sync_manager_add_entry(SyncEntry *entry)
 
 void sync_manager_clear_entries(void)
 {
-    DEBUG("clearing syncmanager entries");
+    //DEBUG("clearing syncmanager entries");
 
     g_slist_free(entries);
     entries = NULL;
@@ -182,7 +187,7 @@ static SyncNetAction *sync_manager_get_selected_actions(gint *n)
 }
 
 #if SOUP_CHECK_VERSION(3,0,0)
-static const char *sync_manager_get_proxy(void)
+static GProxyResolver *sync_manager_get_proxy(void)
 {
     const gchar *conf;
 
@@ -192,7 +197,7 @@ static const char *sync_manager_get_proxy(void)
         }
     }
 
-    return conf;
+    return g_simple_proxy_resolver_new(conf,NULL);
 }
 #else
 static SoupURI *sync_manager_get_proxy(void)
@@ -214,8 +219,9 @@ static void ensure_soup_session(void)
 {
     if (!session) {
 #if SOUP_CHECK_VERSION(3,0,0)
-      const char *proxy=sync_manager_get_proxy();
-      session = soup_session_new_with_options("timeout", 10,"proxy-resolver", proxy,  NULL);
+      GProxyResolver *resolver=sync_manager_get_proxy();
+      session = soup_session_new_with_options("timeout", 10, "proxy-resolver", resolver, NULL);
+      if(resolver) g_object_unref(resolver);
 #else
 #if SOUP_CHECK_VERSION(2,42,0)
         SoupURI *proxy = sync_manager_get_proxy();
@@ -425,18 +431,24 @@ static gboolean send_request_for_net_action(SyncNetAction *sna)
           uri = g_strdup_printf("%s/%s?ver=%s&blobver=%d&rel=%d", API_SERVER_URI, sna->entry->file_name,VERSION,our_blobs_update_version,RELEASE);
 	} else if(strncmp(sna->entry->file_name,"benchmark.json",14)==0){
 	    if (sna->entry->generate_contents_for_upload == NULL) {//GET/Fetch
+	        gchar *cpuname=module_call_method("devices::getProcessorName");
+		gchar *machinetype=module_call_method("computer::getMachineTypeEnglish");
 	        if(params.bench_user_note){
-		  uri = g_strdup_printf("%s/%s?ver=%s&L=%d&rel=%d&MT=%s&BUN=%s", API_SERVER_URI,
+		  uri = g_strdup_printf("%s/%s?ver=%s&L=%d&rel=%d&MT=%s&CPU=%s&BUN=%s", API_SERVER_URI,
 				        sna->entry->file_name, VERSION,
 		                        params.max_bench_results,RELEASE,
-					module_call_method("computer::getMachineType"),
+					machinetype,
+					cpuname,
 					params.bench_user_note);
 		} else {
-		  uri = g_strdup_printf("%s/%s?ver=%s&L=%d&rel=%d&&MT=%s", API_SERVER_URI,
+		  uri = g_strdup_printf("%s/%s?ver=%s&L=%d&rel=%d&&MT=%s&CPU=%s", API_SERVER_URI,
 					sna->entry->file_name, VERSION,
 		                        params.max_bench_results, RELEASE,
-					module_call_method("computer::getMachineType"));
+					machinetype,
+					cpuname);
 		}
+		g_free(cpuname);
+		g_free(machinetype);
 	    } else {//POST/Send
 	      uri = g_strdup_printf("%s/%s?ver=%s&rel=%d", API_SERVER_URI,
 				    sna->entry->file_name, VERSION, RELEASE);
@@ -510,6 +522,27 @@ sync_dialog_netarea_start_actions(SyncDialog *sd, SyncNetAction sna[], gint n)
     const gchar *curr_str = "\342\226\266";
     const gchar *empty_str = "\302\240\302\240";
 
+    if(params.bench_user_note && !strstr(params.bench_user_note,"Group-MachineName-ServerReq")) {
+        GKeyFile *key_file = g_key_file_new();
+	g_mkdir(g_get_user_config_dir(),0755);
+	g_mkdir(g_build_filename(g_get_user_config_dir(), "hardinfo2", NULL),0755);
+	gchar *conf_path = g_build_filename(g_get_user_config_dir(), "hardinfo2", "settings.ini", NULL);
+	g_key_file_load_from_file( key_file, conf_path,
+				   G_KEY_FILE_KEEP_COMMENTS | G_KEY_FILE_KEEP_TRANSLATIONS, NULL);
+	if(params.bench_user_note) {
+	    g_key_file_set_string(key_file, "Sync", "UserNote", params.bench_user_note);
+	} else {
+	    g_key_file_set_string(key_file, "Sync", "UserNote", "");
+	}
+#if GLIB_CHECK_VERSION(2,40,0)
+	g_key_file_save_to_file(key_file, conf_path, NULL);
+#else
+	g2_key_file_save_to_file(key_file, conf_path, NULL);
+#endif
+	g_free(conf_path);
+	g_key_file_free(key_file);
+    }
+
     labels = g_new0(GtkWidget *, n);
     status_labels = g_new0(GtkWidget *, n);
 
@@ -534,8 +567,7 @@ sync_dialog_netarea_start_actions(SyncDialog *sd, SyncNetAction sna[], gint n)
         gtk_widget_show_all(hbox);
     }
 
-    while (gtk_events_pending())
-        gtk_main_iteration();
+    int ii=5;while(ii-- && gtk_events_pending() && !gtk_main_iteration_do(FALSE)) {;}
 
     for (i = n-1; i >0; i--) {
         gchar *markup;
@@ -664,6 +696,35 @@ static void sel_toggle(GtkCellRendererToggle *cellrenderertoggle,
 
 static void close_clicked(void) { g_main_loop_quit(loop); }
 
+
+void insert_text_event(GtkEditable *editable, const gchar *text, gint length, gint *position, gpointer data) {
+    int i,c=0;
+    guint u;
+    gchar *usernote=g_strdup(g_strconcat(gtk_entry_get_text(data),text,NULL));
+
+    //first cannot be dash
+    //if((*position==0) && (text[0]=='-')) {g_signal_stop_emission_by_name(G_OBJECT(editable), "insert-text");g_free(usernote);return;}
+    //only two dash
+    for (u=0; u < strlen(usernote); u++) if(usernote[u]=='-') c++;
+    if(c>2) {g_signal_stop_emission_by_name(G_OBJECT(editable), "insert-text");g_free(usernote);return;}
+    //check digit+alpha+dash
+    for (i = 0; i < length; i++) {
+	if (!isalpha(text[i]) && !isdigit(text[i]) && (text[i]!='-')) {
+            g_signal_stop_emission_by_name(G_OBJECT(editable), "insert-text");
+	    g_free(usernote);
+	    return;
+        }
+    }
+}
+
+void changed_event(GtkEditable *editable, gpointer data) {
+    gchar *usernote=g_strdup(gtk_entry_get_text(data));
+    //printf("Usernote=%s\n",usernote);
+    if(params.bench_user_note) g_free(params.bench_user_note);
+    params.bench_user_note=usernote;
+}
+
+
 static SyncDialog *sync_dialog_new(GtkWidget *parent)
 {
     SyncDialog *sd;
@@ -675,9 +736,10 @@ static SyncDialog *sync_dialog_new(GtkWidget *parent)
     GtkWidget *button8;
     GtkWidget *button7;
     GtkWidget *button6;
-    GtkWidget *priv_policy_btn;
-    GtkWidget *label;
-    GtkWidget *hbox;
+    GtkWidget *priv_policy_btn,*link1;
+    GtkWidget *label,*label2,*label3;
+    GtkWidget *hbox,*hbox2,*hbox3;
+    GtkWidget *usernote;
 
     GtkTreeViewColumn *column;
     GtkTreeModel *model;
@@ -692,7 +754,7 @@ static SyncDialog *sync_dialog_new(GtkWidget *parent)
     gtk_window_set_title(GTK_WINDOW(dialog), _("Synchronize"));
     gtk_window_set_resizable(GTK_WINDOW(dialog), FALSE);
     gtk_window_set_icon(GTK_WINDOW(dialog), icon_cache_get_pixbuf("sync.svg"));
-    gtk_window_set_default_size(GTK_WINDOW(dialog), 420*params.scale, 260*params.scale);
+    gtk_window_set_default_size(GTK_WINDOW(dialog), 560*params.scale, 500*params.scale);
     gtk_window_set_position(GTK_WINDOW(dialog), GTK_WIN_POS_CENTER_ON_PARENT);
     gtk_window_set_type_hint(GTK_WINDOW(dialog), GDK_WINDOW_TYPE_HINT_DIALOG);
 
@@ -725,6 +787,55 @@ static SyncDialog *sync_dialog_new(GtkWidget *parent)
     gtk_box_pack_start(GTK_BOX(hbox), icon_cache_get_image_at_size("sync.svg", 64, 64), FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, TRUE, 0);
     gtk_widget_show_all(hbox);
+
+    //UserNote
+#if GTK_CHECK_VERSION(3, 0, 0)
+    hbox2 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+#else
+    hbox2 = gtk_hbox_new(FALSE, 5);
+#endif
+    gtk_box_pack_start(GTK_BOX(dialog1_vbox), hbox2, FALSE, FALSE, 0);
+
+    usernote = gtk_entry_new();
+    gtk_entry_set_max_length(GTK_ENTRY(usernote),50);
+    g_signal_connect (usernote, "insert-text", G_CALLBACK(insert_text_event), (gpointer) usernote);
+    g_signal_connect (usernote, "changed", G_CALLBACK(changed_event), (gpointer) usernote);
+    if(!params.bench_user_note){//Fetch UserNote from Settings if not specified
+        GKeyFile *key_file = g_key_file_new();
+	gchar *conf_path = g_build_filename(g_get_user_config_dir(), "hardinfo2", "settings.ini", NULL);
+	g_key_file_load_from_file(key_file, conf_path,
+				G_KEY_FILE_KEEP_COMMENTS | G_KEY_FILE_KEEP_TRANSLATIONS, NULL);
+	params.bench_user_note = g_key_file_get_string(key_file, "Sync", "UserNote", NULL);
+        g_free(conf_path);
+	g_key_file_free(key_file);
+    }
+
+    if(params.bench_user_note) gtk_entry_set_text (GTK_ENTRY(usernote), params.bench_user_note);
+    else gtk_entry_set_text (GTK_ENTRY(usernote), "Group-MachineName-ServerReq");
+
+    label2 = gtk_label_new(_("User Note "));
+    gtk_label_set_line_wrap(GTK_LABEL(label2), FALSE);
+    gtk_label_set_use_markup(GTK_LABEL(label2), TRUE);
+
+    gtk_box_pack_start(GTK_BOX(hbox2), label2, FALSE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(hbox2), usernote, TRUE, TRUE, 0);
+    gtk_widget_show_all(hbox2);
+
+    //user note help
+#if GTK_CHECK_VERSION(3, 0, 0)
+    hbox3 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+#else
+    hbox3 = gtk_hbox_new(FALSE, 5);
+#endif
+    gtk_box_pack_start(GTK_BOX(dialog1_vbox), hbox3, FALSE, FALSE, 0);
+
+    label3 = gtk_label_new(_("Leave it default/blank or see "));
+    gtk_label_set_line_wrap(GTK_LABEL(label3), FALSE);
+    gtk_label_set_use_markup(GTK_LABEL(label3), TRUE);
+    link1 = gtk_link_button_new_with_label("https://hardinfo2.org/userguide#usernote", _("User Guide"));
+    gtk_box_pack_start(GTK_BOX(hbox3), label3, FALSE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(hbox3), link1, FALSE, TRUE, 0);
+    gtk_widget_show_all(hbox3);
 
     gtk_box_pack_start(GTK_BOX(dialog1_vbox), sd->sna->vbox, TRUE, TRUE, 0);
 
@@ -842,7 +953,6 @@ static gboolean sync_one(gpointer data)
 
 out:
     g_main_loop_unref(loop);
-    idle_free(sna);
     return FALSE;
 }
 

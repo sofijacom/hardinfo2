@@ -8,32 +8,34 @@ needs to be updated
 
 When done the .po files are ready to be changed, thanx for helping with translation.
 
+
 Status
 ------
 This is an example of status of the different languages including your own after
 editing - use the ./updatepo.sh
 
-hardinfo2.pot now has 1277 strings (-1), with 62 c-format strings
-- [ ] da.po : (331 / 1277 remain untranslated, needs work/fuzzy: 0)
-- [ ] de.po : (795 / 1277 remain untranslated, needs work/fuzzy: 2)
-- [ ] es.po : (394 / 1277 remain untranslated, needs work/fuzzy: 18)
-- [ ] fr.po : (811 / 1277 remain untranslated, needs work/fuzzy: 0)
-- [ ] hu.po : (1109 / 1277 remain untranslated, needs work/fuzzy: 0)
-- [ ] ko.po : (165 / 1277 remain untranslated, needs work/fuzzy: 0)
-- [ ] pt_BR.po : (296 / 1277 remain untranslated, needs work/fuzzy: 0)
-- [ ] pt.po : (153 / 1277 remain untranslated, needs work/fuzzy: 0)
-- [ ] ru.po : (420 / 1277 remain untranslated, needs work/fuzzy: 0)
-- [ ] tr.po : (107 / 1277 remain untranslated, needs work/fuzzy: 0)
-- [ ] zh_CN.po : (929 / 1277 remain untranslated, needs work/fuzzy: 0)
-
+hardinfo2.pot now has 1331 strings (+2), with 63 c-format strings
+(as of fbbbe9ad-dirty fbbbe9ad1f8ed4486bf7a059f07b9c25d50a4375)
+- [ ] da.po : (3 / 1331 remain untranslated, needs work/fuzzy: 0)
+- [ ] de.po : (858 / 1331 remain untranslated, needs work/fuzzy: 2)
+- [ ] es.po : (456 / 1331 remain untranslated, needs work/fuzzy: 18)
+- [ ] fr.po : (850 / 1331 remain untranslated, needs work/fuzzy: 0)
+- [ ] hu.po : (1167 / 1331 remain untranslated, needs work/fuzzy: 0)
+- [ ] ko.po : (230 / 1331 remain untranslated, needs work/fuzzy: 0)
+- [ ] pt_BR.po : (25 / 1331 remain untranslated, needs work/fuzzy: 0)
+- [ ] pt.po : (219 / 1331 remain untranslated, needs work/fuzzy: 0)
+- [x] ru.po : (0 / 1331 remain untranslated, needs work/fuzzy: 0)
+- [ ] tr.po : (20 / 1331 remain untranslated, needs work/fuzzy: 0)
+- [ ] zh_CN.po : (935 / 1331 remain untranslated, needs work/fuzzy: 0)
 
 Needs work/fuzzy typically has to do with spaces/periods at begin/end of translation.
+
 
 Editing
 -------
 Use the poedit program installed by:
  - apt install poedit  (Debian flavours)
- - yum install poedit  (Redhat flabours)
+ - yum install poedit  (Redhat flavours)
 
 Start the program:
  - poedit ./xx.po   (xx=LANGUAGE-2LETTER-SMALL-CAPS)
@@ -56,3 +58,5 @@ Backup and Commit to GitHub
  - git push         (Push it to github)
 
 It is better to make a git push too much than loose all your great work.
+Update gettext translation files.
+

@@ -21,7 +21,8 @@
 #include "benchmark.h"
 #include "cpu_util.h"
 
-#define STATMSG "Performing Alexey Kopytov's sysbench memory benchmark"
+#define STATMEMMSG "Performing Alexey Kopytov's sysbench memory benchmark"
+#define STATCPUMSG "Performing Alexey Kopytov's sysbench cpu benchmark"
 
 /* known to work with:
  * sysbench 0.4.12 --> r:4012
@@ -93,7 +94,6 @@ static gboolean sysbench_run(struct sysbench_ctx *ctx, int expecting_version) {
         /* v1.x.x: sysbench [options]... [testname] [command] */
         cmd_line = g_strdup_printf("sysbench --threads=%d --time=%d %s %s run", ctx->threads, ctx->max_time, ctx->parms_test, ctx->test);
     }
-    //bench_msg("\ncmd_line: %s", cmd_line);
 
     spawned = g_spawn_command_line_sync(cmd_line,
             &out, &err, NULL, NULL);
@@ -159,8 +159,6 @@ static gboolean sysbench_run(struct sysbench_ctx *ctx, int expecting_version) {
         g_free(out);
         g_free(err);
     } else {
-        bench_msg("\nfailed to spawn sysbench");
-        sleep(5);
     }
 
     if (ctx->r.result == -1)
@@ -169,7 +167,6 @@ static gboolean sysbench_run(struct sysbench_ctx *ctx, int expecting_version) {
     return spawned;
 
 sysbench_failed:
-    bench_msg("\nfailed to configure sysbench");
     g_free(out);
     g_free(err);
     return 0;
@@ -208,7 +205,7 @@ void benchmark_memory_run(int threads, int result_index) {
 
     shell_view_set_enabled(FALSE);
     char msg[128] = "";
-    snprintf(msg, 128, "%s (threads: %d)", STATMSG, threads);
+    snprintf(msg, 128, "%s (threads: %d)", STATMEMMSG, threads);
     shell_status_update(msg);
 
     sysbench_run(&ctx, sbv);
@@ -229,7 +226,7 @@ void benchmark_sbcpu_single(void) {
         .r = EMPTY_BENCH_VALUE};
 
     shell_view_set_enabled(FALSE);
-    shell_status_update(STATMSG " (single thread)...");
+    shell_status_update(STATCPUMSG " (single thread)...");
 
     sysbench_run(&ctx, 0);
     bench_results[BENCHMARK_SBCPU_SINGLE] = ctx.r;
@@ -248,7 +245,7 @@ void benchmark_sbcpu_all(void) {
         .r = EMPTY_BENCH_VALUE};
 
     shell_view_set_enabled(FALSE);
-    shell_status_update(STATMSG " (Multi-thread)...");
+    shell_status_update(STATCPUMSG " (Multi-thread)...");
 
     sysbench_run(&ctx, 0);
     bench_results[BENCHMARK_SBCPU_ALL] = ctx.r;
@@ -263,7 +260,7 @@ void benchmark_sbcpu_quad(void) {
         .r = EMPTY_BENCH_VALUE};
 
     shell_view_set_enabled(FALSE);
-    shell_status_update(STATMSG " (Four thread)...");
+    shell_status_update(STATCPUMSG " (Four thread)...");
 
     sysbench_run(&ctx, 0);
     bench_results[BENCHMARK_SBCPU_QUAD] = ctx.r;

@@ -30,6 +30,9 @@ enum BenchmarkEntries {
 #if(HARDINFO2_QT5)
     BENCHMARK_OPENGL,
 #endif
+#if(HARDINFO2_VK)
+    BENCHMARK_VULKAN,
+#endif
     BENCHMARK_STORAGE,
     BENCHMARK_CACHEMEM,
     BENCHMARK_N_ENTRIES
@@ -57,6 +60,7 @@ void benchmark_iperf3_single(void);
 #if(HARDINFO2_QT5)
 void benchmark_opengl(void);
 #endif
+void benchmark_vulkan(void);
 void benchmark_storage(void);
 void benchmark_cachemem(void);
 
@@ -93,6 +97,6 @@ extern bench_value bench_results[BENCHMARK_N_ENTRIES];
  * or return null */
 gchar *get_test_data(gsize min_size);
 char *md5_digest_str(const char *data, unsigned int len);
-#define bench_msg(msg, ...)  fprintf (stderr, "[%s] " msg "\n", __FUNCTION__, ##__VA_ARGS__)
+//#define bench_msg(msg, ...)  fprintf (stderr, "[%s] " msg "\n", __FUNCTION__, ##__VA_ARGS__)
 
 #endif /* __BENCHMARK_H__ */

@@ -19,6 +19,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 
 #include <gtk/gtk.h>
 #include <glib/gstdio.h>
@@ -37,6 +38,9 @@
 #include "uri_handler.h"
 
 #include "callbacks.h"
+
+gboolean updating=TRUE;
+gboolean closing=FALSE;
 
 struct UpdateTableItem {
     union {
@@ -229,14 +233,10 @@ void shell_action_set_active(const gchar * action_name, gboolean setting)
 void shell_status_pulse(void)
 {
     if (params.gui_running) {
-	if (shell->_pulses++ == 5) {
-	    /* we're pulsing for some time, disable the interface and change the cursor
-	       to a hourglass */
-	    shell_view_set_enabled(FALSE);
-	}
+	if(shell && shell->selected_module && strcmp(shell->selected_module->name,_("Benchmark")))
+	    if(gtk_widget_get_visible(shell->progress)) gtk_progress_bar_pulse(GTK_PROGRESS_BAR(shell->progress));
+	int ii=5;while(ii-- && gtk_events_pending() && !gtk_main_iteration_do(FALSE)) {;}
 
-	gtk_progress_bar_pulse(GTK_PROGRESS_BAR(shell->progress));
-	while (gtk_events_pending()) gtk_main_iteration();
     } else if (!params.quiet) {
 	static gint counter = 0;
 
@@ -248,10 +248,7 @@ void shell_status_pulse(void)
 void shell_status_set_percentage(gint percentage)
 {
     if (params.gui_running) {
-	gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(shell->progress),
-				      (float) percentage / 100.0);
-	while (gtk_events_pending())
-	    gtk_main_iteration();
+	if(gtk_widget_get_visible(shell->progress)) gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(shell->progress), (float) percentage / 100.0);
     } else if (!params.quiet) {
 	if (percentage < 1 || percentage >= 100) {
 	    fprintf(stderr, "\033[2K");
@@ -271,12 +268,11 @@ void shell_view_set_enabled(gboolean setting)
     //DEBUG("SHELL_VIEW=%s\n",setting?"Normal":"Busy");
     if (!params.gui_running)
 	return;
-
     if (setting) {
 	shell->_pulses = 0;
-	widget_set_cursor(shell->window, GDK_LEFT_PTR);
+	widget_set_cursor(GTK_WIDGET(shell->window), GDK_LEFT_PTR);
     } else {
-        widget_set_cursor(shell->window, GDK_WATCH);
+	widget_set_cursor(GTK_WIDGET(shell->window), GDK_WATCH);
     }
 
     gtk_widget_set_sensitive(shell->hbox, setting);
@@ -284,7 +280,10 @@ void shell_view_set_enabled(gboolean setting)
     shell_action_set_enabled("RefreshAction", setting);
     //shell_action_set_enabled("CopyAction", setting);
     shell_action_set_enabled("ReportAction", setting);
-    shell_action_set_enabled("SyncManagerAction", setting && sync_manager_count_entries() > 0);
+    shell_action_set_enabled("SyncManagerAction", setting);
+    int ii=5;while(ii-- && gtk_events_pending() && !gtk_main_iteration_do(FALSE)) {;}
+    updating=!setting;
+    if(!updating && closing) cb_quit();
 }
 
 void shell_status_set_enabled(gboolean setting)
@@ -293,12 +292,11 @@ void shell_status_set_enabled(gboolean setting)
     if (!params.gui_running)
 	return;
 
+    shell_view_set_enabled(!setting);
     if (setting)
         gtk_widget_show(shell->progress);
     else {
         gtk_widget_hide(shell->progress);
-	shell_view_set_enabled(TRUE);
-
 	shell_status_update(_("Done."));
     }
 }
@@ -319,7 +317,6 @@ void shell_do_reload(gboolean reload)
     if(!params.aborting_benchmarks) {
         module_selected(NULL);
     } else {
-        shell_status_update("Ready.");
         shell_status_set_enabled(FALSE);
     }
 
@@ -334,22 +331,21 @@ void shell_status_update(const gchar * message)
 {
     //DEBUG("Shell_status_update %s",message);
     if (params.gui_running) {
-	gtk_label_set_markup(GTK_LABEL(shell->status), message);
-	gtk_progress_bar_set_pulse_step(GTK_PROGRESS_BAR(shell->progress),1);
-	gtk_progress_bar_pulse(GTK_PROGRESS_BAR(shell->progress));
-        //gtk_widget_set_sensitive(shell->window, TRUE);
-	//gtk_window_set_focus(shell->window,);
-	//gtk_widget_grab_focus(shell->window);
-	//gtk_widget_activate(shell->window);
-	//gtk_window_get_focus_visible(shell->window);
-	while (gtk_events_pending()) gtk_main_iteration();
+        if(gtk_widget_get_visible(shell->status)) gtk_label_set_markup(GTK_LABEL(shell->status), message);
     } else if (!params.quiet) {
 	fprintf(stderr, "\033[2K\033[40;37;1m %s\033[0m\r", message);
     }
 }
 
-static void destroy_me(void)
-{
+gboolean destroy_event (GtkWidget* self, GdkEvent* event, gpointer user_data) {
+    if(!updating){
+        return FALSE;
+    } else {
+        closing=TRUE;
+        return TRUE;
+    }
+}
+static void destroy_me(void){
     cb_quit();
 }
 
@@ -408,12 +404,9 @@ static void stylechange3_me(void)
     if(settings && !newgnome) keys=g_settings_list_keys(settings);
     while(!newgnome && keys && (keys[i]!=NULL)){
         if(strcmp(keys[i],"color-scheme")==0) newgnome=1;
-	g_free(keys[i]);
         i++;
     }
-    //check Adwaita as new gnome uses it - but new mate/budgie does not
-    //theme = g_settings_get_string(settings, "gtk-theme");
-    //if(!strstr(theme,"Adwaita")) newgnome=0;
+    if(keys) g_strfreev(keys);
 
     //new gnome using only normal/dark mode
     if(settings){
@@ -541,7 +534,8 @@ static void create_window(void)
     gtk_window_set_icon(GTK_WINDOW(shell->window), icon_cache_get_pixbuf("hardinfo2.svg"));
     shell_set_title(shell, NULL);
     gtk_window_set_default_size(GTK_WINDOW(shell->window), 1280*params.scale, 800*params.scale);
-    g_signal_connect(G_OBJECT(shell->window), "destroy", destroy_me, NULL);
+    g_signal_connect(G_OBJECT(shell->window), "destroy", G_CALLBACK(destroy_me), NULL);
+    g_signal_connect(G_OBJECT(shell->window), "delete-event", G_CALLBACK(destroy_event), NULL);
 #if GTK_CHECK_VERSION(3, 0, 0)
     g_signal_connect(G_OBJECT(shell->window), "style-updated", stylechange_me, NULL);
     g_signal_connect_after(G_OBJECT(shell->window), "draw", stylechange2_me, NULL);
@@ -577,8 +571,10 @@ static void create_window(void)
 #if GTK_CHECK_VERSION(3, 0, 0)
     gtk_widget_set_valign(GTK_WIDGET(shell->progress), GTK_ALIGN_CENTER);
 #else
-    gtk_misc_set_alignment(GTK_MISC(shell->progress), 0.0, 0.5);
+    //Results in conversion error - just disable for GTK2
+    //gtk_misc_set_alignment(GTK_MISC(shell->progress), 0.0, 0.5);
 #endif
+    gtk_progress_bar_set_pulse_step(GTK_PROGRESS_BAR(shell->progress),0.10);
     gtk_widget_hide(shell->progress);
     gtk_box_pack_end(GTK_BOX(hbox), shell->progress, FALSE, FALSE, 5);
 
@@ -642,6 +638,40 @@ static void create_window(void)
 #endif
 
     gtk_widget_show(shell->window);
+
+    //Check packaging
+    gchar *pkgok=NULL,*p;
+    //minimum of packages installed by hardinfo2 package - as specified on README.md
+    //pkgok=g_strdup("TESTING\n");//for testing - always triggers
+    if(!check_program("awk"))                                     {p=pkgok;pkgok=g_strconcat("gawk\n", pkgok, NULL);g_free(p);}
+    if(!check_program("dmidecode"))                               {p=pkgok;pkgok=g_strconcat("dmidecode\n", pkgok, NULL);g_free(p);}
+    if(!check_program("xdg-open"))                                {p=pkgok;pkgok=g_strconcat("xdg-open / xdg-utils\n", pkgok, NULL);g_free(p);}
+    if(strstr(PACK_REQ,"udisk") && !check_program("udisksctl"))   {p=pkgok;pkgok=g_strconcat("udisk2\n", pkgok, NULL);g_free(p);}
+    if(strstr(PACK_REQ,"vulkan") && !check_program("vulkaninfo")) {p=pkgok;pkgok=g_strconcat("vulkaninfo / vulkan-tools\n", pkgok, NULL);g_free(p);}
+    if(!check_program("glxinfo"))                                 {p=pkgok;pkgok=g_strconcat("glxinfo / mesa-utils\n", pkgok, NULL);g_free(p);}
+    if(strstr(PACK_REQ,"iperf") && !check_program("iperf3"))      {p=pkgok;pkgok=g_strconcat("iperf3\n", pkgok, NULL);g_free(p);}
+    if(strstr(PACK_REQ,"sysbench") && !check_program("sysbench")) {p=pkgok;pkgok=g_strconcat("sysbench\n", pkgok, NULL);g_free(p);}
+#if(HARDINFO2_QT5)
+    //no binary in qt5-base package
+    //if(!check_program("qmake-qt5")) {p=pkgok;pkgok=g_strconcat("qt5-base\n", pkgok, NULL);g_free(p);}
+#endif
+    //randr optional
+    //if(strstr(PACK_REQ,"randr") && !check_program("xrandr"))      {p=pkgok;pkgok=g_strconcat("xrandr\n", pkgok, NULL);g_free(p);}
+    //fwupd optional
+    //if(strstr(PACK_REQ,"fwupd") && !check_program("fwupdtool") && !check_program("fwupdmgr") ) {p=pkgok;pkgok=g_strconcat("fwupd\n", pkgok, NULL);g_free(p);}
+    if(pkgok){
+        GtkDialogFlags flags = GTK_DIALOG_DESTROY_WITH_PARENT;
+	GtkWidget *pkgdialog;
+        pkgdialog = gtk_message_dialog_new_with_markup (GTK_WINDOW(shell->window),
+			 flags,
+			 GTK_MESSAGE_ERROR,
+			 GTK_BUTTONS_CLOSE,
+			 _("<b>Hardinfo2 not packaged correctly</b>\n\nMissing packages:\n\n%s\n\nPlease fix by installing manually"),
+			 pkgok);//PACK_REQ);
+        gtk_dialog_run (GTK_DIALOG (pkgdialog));
+        gtk_widget_destroy (pkgdialog);
+	g_free(pkgok);
+    }
 }
 
 static void view_menu_select_entry(gpointer data, gpointer data2)
@@ -748,8 +778,7 @@ DetailView *detail_view_new(void)
     return detail_view;
 }
 
-static gboolean
-select_first_tree_item(gpointer data)
+static gboolean select_first_tree_item(gpointer data)
 {
     GtkTreeIter first;
 
@@ -758,6 +787,39 @@ select_first_tree_item(gpointer data)
 
     return FALSE;
 }
+
+static gboolean select_marked_or_first_item(gpointer data)
+{
+    GtkTreeIter first, it;
+    gboolean found_selection = FALSE;
+    gchar *datacol;
+
+    if (gtk_tree_model_get_iter_first(shell->info_tree->model, &first)) {
+        it = first;
+        while (gtk_tree_model_iter_next(shell->info_tree->model, &it)) {
+            gtk_tree_model_get(shell->info_tree->model, &it, INFO_TREE_COL_DATA, &datacol, -1);
+
+            if (key_is_highlighted(datacol)) {
+                gtk_tree_selection_select_iter(shell->info_tree->selection, &it);
+
+		//scoll to selected this machine benchmark
+		GtkTreePath *path=gtk_tree_model_get_path(shell->info_tree->model, &it);
+	        gtk_tree_view_scroll_to_cell (GTK_TREE_VIEW(shell->info_tree->view), path, NULL, TRUE, 0.5, 0.0);
+		gtk_tree_path_free(path);
+
+                found_selection = TRUE;
+		g_free(datacol);
+		return FALSE;
+            }
+            g_free(datacol);
+        }
+
+        if (!found_selection)
+            gtk_tree_selection_select_iter(shell->info_tree->selection, &first);
+    }
+    return FALSE;
+}
+
 
 static void
 check_for_updates(void)
@@ -807,6 +869,10 @@ void shell_set_transient_dialog(GtkWindow *dialog)
 
 void shell_init(GSList * modules)
 {
+    gchar *path;
+    unsigned int latest_ver=0,u1=0,u2=0,u3=0,a1=0,a2=0,a3=0,app_ver=0;
+    int fd=-1;
+
     if (shell) {
 	g_error("Shell already created");
 	return;
@@ -823,6 +889,35 @@ void shell_init(GSList * modules)
     shell_action_set_property("RefreshAction", "is-important", TRUE);
     shell_action_set_property("ReportAction", "is-important", TRUE);
     shell_action_set_property("SyncManagerAction", "is-important", TRUE);
+    shell_action_set_property("UpdateAction", "is-important", TRUE);
+
+    path = g_build_filename(g_get_user_config_dir(), "hardinfo2","blobs-update-version.json", NULL);
+    fd = open(path,O_RDONLY);
+    if(fd>=0){
+        char *buf=NULL;
+	struct stat st;
+	stat(path,&st);
+	if(st.st_size>0){
+	    buf=g_malloc(st.st_size+1);
+	    if(buf){
+	        int i=read(fd, buf, st.st_size);
+	        if(i>0){
+		    buf[st.st_size]=0;
+		    char *s=strstr(buf,"\"latest-program-version\"");
+	            if(s && sscanf(s,"\"latest-program-version\":\"%u.%u.%u\"",&u1,&u2,&u3)==3) latest_ver=u1*10000+u2*100+u3;
+	        }
+	    }
+        }
+        close(fd);
+	g_free(buf);
+    }
+    free(path);
+    if(sscanf(VERSION,"%u.%u.%u",&a1,&a2,&a3)==3) app_ver=a1*10000+a2*100+a3;
+    if(app_ver && (latest_ver > app_ver)){
+        shell_action_set_property("UpdateAction", "visible-horizontal", TRUE);
+    } else {
+        shell_action_set_property("UpdateAction", "visible-horizontal", FALSE);
+    }
 
 #if GTK_CHECK_VERSION(3, 0, 0)
     shell_action_set_property("DisableThemeAction", "draw-as-radio", TRUE);
@@ -857,10 +952,7 @@ void shell_init(GSList * modules)
     gtk_notebook_set_show_tabs(GTK_NOTEBOOK(shell->notebook), FALSE);
     gtk_notebook_set_show_border(GTK_NOTEBOOK(shell->notebook), FALSE);
 
-    shell_status_set_enabled(TRUE);
-    shell_status_update(_("Loading modules..."));
-
-    shell->tree->modules = modules ? modules : modules_load_all();
+    shell->tree->modules = modules;
 
     check_for_updates();
 
@@ -872,16 +964,6 @@ void shell_init(GSList * modules)
     load_graph_configure_expose(shell->loadgraph);
     gtk_widget_hide(shell->notebook);
     gtk_widget_hide(shell->note->event_box);
-
-    shell_status_update(_("Done."));
-    shell_status_set_enabled(FALSE);
-
-    shell_action_set_enabled("RefreshAction", FALSE);
-    //shell_action_set_enabled("CopyAction", FALSE);
-    shell_action_set_active("SidePaneAction", TRUE);
-    shell_action_set_active("ToolbarAction", TRUE);
-
-    shell_action_set_enabled("SyncManagerAction", sync_manager_count_entries() > 0);
 
     /* Should select Computer Summary (note: not Computer/Summary) */
     g_idle_add(select_first_tree_item, NULL);
@@ -956,11 +1038,13 @@ static gboolean update_field(gpointer data)
 }
 
 #if GTK_CHECK_VERSION(3, 0, 0)
-    #define RANGE_SET_VALUE(tree,scrollbar,value) {while (gtk_events_pending()) gtk_main_iteration();gtk_range_set_value(GTK_RANGE(gtk_scrolled_window_get_##scrollbar(GTK_SCROLLED_WINDOW(shell->tree->scroll))), value);}
+    #define RANGE_SET_VALUE(tree,scrollbar,value) {gtk_range_set_value(GTK_RANGE(gtk_scrolled_window_get_##scrollbar(GTK_SCROLLED_WINDOW(shell->tree->scroll))), value);}
     #define RANGE_GET_VALUE(tree,scrollbar) gtk_range_get_value(GTK_RANGE(gtk_scrolled_window_get_##scrollbar(GTK_SCROLLED_WINDOW(shell->tree->scroll))))
 #else
+  #define _CONCAT(a,b) a ## b
+  #define CONCAT(a,b) _CONCAT(a,b)
   #define RANGE_SET_VALUE(tree, scrollbar, value)			       \
-    do {                                                                       \
+    do {								       \
         GtkRange CONCAT(*range, __LINE__) =                                    \
             GTK_RANGE(GTK_SCROLLED_WINDOW(shell->tree->scroll)->scrollbar);    \
         gtk_range_set_value(CONCAT(range, __LINE__), value);                   \
@@ -982,8 +1066,6 @@ static void detail_view_clear(DetailView *detail_view)
 {
     gtk_container_forall(GTK_CONTAINER(shell->detail_view->view),
                          destroy_widget, NULL);
-    RANGE_SET_VALUE(detail_view, vscrollbar, 0.0);
-    RANGE_SET_VALUE(detail_view, hscrollbar, 0.0);
 }
 
 static gboolean reload_section(gpointer data)
@@ -1023,7 +1105,12 @@ static gboolean reload_section(gpointer data)
         }
 
         /* restore position */
-        if(pos_info_scroll) RANGE_SET_VALUE(info_tree, vscrollbar, pos_info_scroll);
+        if(pos_info_scroll) {
+	    if(strcmp(shell->selected_module->name,_("Network"))==0) {
+	      int ii=5;while(ii-- && gtk_events_pending() && !gtk_main_iteration_do(FALSE)) {;}
+	    }
+	    RANGE_SET_VALUE(info_tree, vscrollbar, pos_info_scroll);
+	}
         if(pos_detail_scroll) RANGE_SET_VALUE(detail_view, vscrollbar, pos_detail_scroll);
 
 	/*UnFreeze widget updates*/
@@ -1280,8 +1367,8 @@ static void group_handle_special(GKeyFile *key_file,
             struct UpdateTableItem *item;
 
             const gchar *ikey = g_utf8_strchr(key, -1, '$');
-            gchar *tag, *name;
-            key_get_components(ikey, NULL, &tag, &name, NULL, NULL, TRUE);
+            gchar *tag=NULL, *name=NULL;
+            key_get_components(ikey, NULL, &tag, &name, NULL, NULL);
 
             if (tag)
                 item = g_hash_table_lookup(update_tbl, tag);
@@ -1391,8 +1478,8 @@ static void group_handle_normal(GKeyFile *key_file,
         struct UpdateTableItem *item = g_new0(struct UpdateTableItem, 1);
         item->is_iter = TRUE;
         item->iter = gtk_tree_iter_copy(&child);
-        gchar *flags, *tag, *name, *label;
-        key_get_components(key, &flags, &tag, &name, &label, NULL, TRUE);
+        gchar *flags=NULL, *tag=NULL, *name=NULL, *label=NULL;
+        key_get_components(key, &flags, &tag, &name, &label, NULL);
 
         if (flags) {
             //TODO: name was formerly used where label is here. Check all uses
@@ -1400,14 +1487,17 @@ static void group_handle_normal(GKeyFile *key_file,
             gtk_tree_store_set(store, &child, INFO_TREE_COL_NAME, label,
                                INFO_TREE_COL_DATA, flags, -1);
             g_hash_table_insert(update_tbl, tag, item);
-            g_free(label);
+	    g_free(name);
         } else {
             gtk_tree_store_set(store, &child, INFO_TREE_COL_NAME, key,
                                INFO_TREE_COL_DATA, NULL, -1);
             g_hash_table_insert(update_tbl, name, item);
-            g_free(tag);
+	    g_free(tag);
         }
+        //g_free(tag);
+        //g_free(name);
         g_free(flags);
+        g_free(label);
 
         g_strfreev(values);
     }
@@ -1523,46 +1613,6 @@ void shell_clear_field_updates(void)
     }
 }
 
-/*static gboolean
-select_first_item(gpointer data)
-{
-    GtkTreeIter first;
-
-    if (gtk_tree_model_get_iter_first(shell->info_tree->model, &first))
-        gtk_tree_selection_select_iter(shell->info_tree->selection, &first);
-
-    return FALSE;
-}*/
-
-static gboolean select_marked_or_first_item(gpointer data)
-{
-    GtkTreeIter first, it;
-    gboolean found_selection = FALSE;
-    gchar *datacol;
-
-    if (gtk_tree_model_get_iter_first(shell->info_tree->model, &first)) {
-        it = first;
-        while (gtk_tree_model_iter_next(shell->info_tree->model, &it)) {
-            gtk_tree_model_get(shell->info_tree->model, &it, INFO_TREE_COL_DATA, &datacol, -1);
-
-            if (key_is_highlighted(datacol)) {
-                gtk_tree_selection_select_iter(shell->info_tree->selection, &it);
-
-		//scoll to selected this machine benchmark
-		GtkTreePath *path=gtk_tree_model_get_path(shell->info_tree->model, &it);
-	        gtk_tree_view_scroll_to_cell (GTK_TREE_VIEW(shell->info_tree->view), path, NULL, TRUE, 0.5, 0.0);
-		gtk_tree_path_free(path);
-
-                found_selection = TRUE;
-            }
-            g_free(datacol);
-        }
-
-        if (!found_selection)
-            gtk_tree_selection_select_iter(shell->info_tree->selection, &first);
-    }
-    return FALSE;
-}
 
 static void module_selected_show_info_list(GKeyFile *key_file,
                                            ShellModuleEntry *entry,
@@ -1692,8 +1742,8 @@ static void module_selected_show_info_detail(GKeyFile *key_file,
             for (j = 0; keys[j]; j++) {
                 gchar *key_markup;
                 gchar *value;
-                gchar *name, *label, *tag, *flags;
-                key_get_components(keys[j], &flags, &tag, &name, &label, NULL, TRUE);
+                gchar *name=NULL, *lbl=NULL, *tag=NULL, *flags=NULL;
+                key_get_components(keys[j], &flags, &tag, &name, &lbl, NULL);
 
                 value = g_key_file_get_string(key_file, groups[i], keys[j], NULL);
 
@@ -1706,9 +1756,9 @@ static void module_selected_show_info_detail(GKeyFile *key_file,
                 const Vendor *v = has_ven ? vendor_match(value, NULL) : NULL;
 
                 if(params.darkmode){
-                    key_markup = g_strdup_printf("<span color=\"#8af\">%s</span>", label);
+                    key_markup = g_strdup_printf("<span color=\"#8af\">%s</span>", lbl);
 		} else {
-                    key_markup = g_strdup_printf("<span color=\"#24f\">%s</span>", label);
+                    key_markup = g_strdup_printf("<span color=\"#24f\">%s</span>", lbl);
 		}
 
                 GtkWidget *key_label = gtk_label_new(key_markup);
@@ -1764,16 +1814,18 @@ static void module_selected_show_info_detail(GKeyFile *key_file,
 
                 if (tag) {
                     g_hash_table_insert(update_tbl, tag, item);
-                    g_free(name);
+		    g_free(name);
                 } else {
                     g_hash_table_insert(update_tbl, name, item);
-                    g_free(tag);
+		    g_free(tag);
                 }
 
+                //g_free(tag);
+                //g_free(name);
                 g_free(flags);
+                g_free(lbl);
                 g_free(value);
                 g_free(key_markup);
-                g_free(label);
             }
 
             gtk_widget_show(table);
@@ -1832,17 +1884,18 @@ module_selected_show_info(ShellModuleEntry *entry, gboolean reload)
         break;
     }
 
-    if (!reload) {
-        switch (shell->view_type) {
-        case SHELL_VIEW_DUAL:
-        case SHELL_VIEW_LOAD_GRAPH:
-        case SHELL_VIEW_PROGRESS_DUAL:
-            g_idle_add(select_marked_or_first_item, NULL);
-        default:
-            break;
-        }
-    }
     shell_set_note_from_entry(entry);
+
+    //Scroll to selected item or first
+    if(entry->flags & MODULE_FLAG_BENCHMARK){
+	select_marked_or_first_item(NULL);
+        g_idle_add(select_marked_or_first_item, NULL);
+        g_idle_add(select_marked_or_first_item, NULL);
+    } else {
+        if((shell->view_type==SHELL_VIEW_DUAL)||(shell->view_type==SHELL_VIEW_LOAD_GRAPH)||(shell->view_type==SHELL_VIEW_PROGRESS_DUAL)){
+	    select_marked_or_first_item(NULL);
+	}
+    }
 }
 
 static void info_selected_show_extra(const gchar *tag)
@@ -2014,7 +2067,7 @@ static void shell_show_detail_view(void)
          groups = g_key_file_get_groups(keyfile, NULL);
 
          for (group = 0; groups[group]; group++) {
-             gchar *icon, *method, *method_result;
+             gchar *icon=NULL, *method=NULL, *method_result=NULL;
 
              shell_status_pulse();
 
@@ -2079,15 +2132,13 @@ static void module_selected(gpointer data)
     }
 
     gtk_tree_model_get(model, &parent, TREE_COL_MODULE, &shell->selected_module, -1);
-
     /* Get the current selection and shows its related info */
     gtk_tree_model_get(model, &iter, TREE_COL_MODULE_ENTRY, &entry, -1);
     if (entry && !entry->selected) {
-        gchar *title;
+        gchar *title=NULL;
 
         shell_status_set_enabled(TRUE);
         shell_status_update(_("Updating..."));
-
         entry->selected = TRUE;
         shell->selected = entry;
         module_selected_show_info(entry, FALSE);
@@ -2100,8 +2151,11 @@ static void module_selected(gpointer data)
             RANGE_SET_VALUE(info_tree, vscrollbar, 0.0);
 	}
         RANGE_SET_VALUE(info_tree, hscrollbar, 0.0);
-        RANGE_SET_VALUE(detail_view, vscrollbar, 0.0);
-        RANGE_SET_VALUE(detail_view, hscrollbar, 0.0);
+
+        if (shell->view_type == SHELL_VIEW_DETAIL) {
+            RANGE_SET_VALUE(detail_view, vscrollbar, 0.0);
+            RANGE_SET_VALUE(detail_view, hscrollbar, 0.0);
+        }
 
         title = g_strdup_printf("%s - %s", shell->selected_module->name, entry->name);
         shell_set_title(shell, title);
@@ -2109,10 +2163,9 @@ static void module_selected(gpointer data)
 
         shell_action_set_enabled("RefreshAction", TRUE);
         //shell_action_set_enabled("CopyAction", TRUE);
-
-        shell_status_update(_("Done."));
         shell_status_set_enabled(FALSE);
     } else {
+        shell_status_set_enabled(TRUE);
         shell_set_title(shell, NULL);
         shell_action_set_enabled("RefreshAction", FALSE);
         //shell_action_set_enabled("CopyAction", FALSE);
@@ -2123,6 +2176,7 @@ static void module_selected(gpointer data)
         if (shell->selected_module->summaryfunc) {
 	    shell_show_detail_view();
         }
+        shell_status_set_enabled(FALSE);
     }
     current = entry;
     updating = FALSE;
@@ -2335,42 +2389,46 @@ gboolean key_is_flagged(const gchar *key) {
 }
 
 gboolean key_is_highlighted(const gchar *key) {
-    gchar *flags;
-    key_get_components(key, &flags, NULL, NULL, NULL, NULL, TRUE);
+    gchar *flags=NULL;
+    key_get_components(key, &flags, NULL, NULL, NULL, NULL);
     if (flags && strchr(flags, '*')) {
         g_free(flags);
         return TRUE;
     }
+    g_free(flags);
     return FALSE;
 }
 
 gboolean key_wants_details(const gchar *key) {
-    gchar *flags;
-    key_get_components(key, &flags, NULL, NULL, NULL, NULL, TRUE);
+    gchar *flags=NULL;
+    key_get_components(key, &flags, NULL, NULL, NULL, NULL);
     if (flags && strchr(flags, '!')) {
         g_free(flags);
         return TRUE;
     }
+    g_free(flags);
     return FALSE;
 }
 
 gboolean key_value_has_vendor_string(const gchar *key) {
-    gchar *flags;
-    key_get_components(key, &flags, NULL, NULL, NULL, NULL, TRUE);
+    gchar *flags=NULL;
+    key_get_components(key, &flags, NULL, NULL, NULL, NULL);
     if (flags && strchr(flags, '^')) {
         g_free(flags);
         return TRUE;
     }
+    g_free(flags);
     return FALSE;
 }
 
 gboolean key_label_is_escaped(const gchar *key) {
-    gchar *flags;
-    key_get_components(key, &flags, NULL, NULL, NULL, NULL, TRUE);
+    gchar *flags=NULL;
+    key_get_components(key, &flags, NULL, NULL, NULL, NULL);
     if (flags && strchr(flags, '@')) {
         g_free(flags);
         return TRUE;
     }
+    g_free(flags);
     return FALSE;
 }
 
@@ -2409,21 +2467,8 @@ const gchar *key_get_name(const gchar *key) {
  * label = "Bar"      // the label displayed
  * dis = "7"
  */
-void key_get_components(const gchar *key,
-    gchar **flags, gchar **tag, gchar **name, gchar **label, gchar **dis,
-    gboolean null_empty) {
-
-    if (null_empty) {
-#define K_NULL_EMPTY(f) if (f) { *f = NULL; }
-        K_NULL_EMPTY(flags);
-        K_NULL_EMPTY(tag);
-        K_NULL_EMPTY(name);
-        K_NULL_EMPTY(label);
-        K_NULL_EMPTY(dis);
-    }
-
-    if (!key || !*key)
-        return;
+void key_get_components(const gchar *key, gchar **flags, gchar **tag, gchar **name, gchar **label, gchar **dis) {
+    if (!key || !*key) return;
 
     const gchar *np = g_utf8_strchr(key+1, -1, '$') + 1;
     if (*key == '$' && np) {
@@ -2433,17 +2478,13 @@ void key_get_components(const gchar *key,
         if(s==NULL) {
 	    DEBUG("ERROR NOT FOUND");
         }else{
- /*            if((s-f+1)>strlen(key)) {
-	    DEBUG("ERROR TOO LATE");
-        }else{*/
 	  *(g_utf8_strchr(f+1, -1, '$') + 1) = 0;
 	  if (flags)
 	    *flags = g_strdup(f);
 	  if (tag)
 	    *tag = key_mi_tag(f);
-	  g_free(f);
-	  //}
 	}
+	g_free(f);
     } else
         np = key;
 

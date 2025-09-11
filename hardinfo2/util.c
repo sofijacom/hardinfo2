@@ -36,6 +36,7 @@
 #include <hardinfo.h>
 #include <gtk/gtk.h>
 
+#include <stdbool.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -83,6 +84,19 @@ gchar *find_program(gchar *program_name)
 
     return NULL;
 }
+
+
+gboolean check_program(gchar *program_name)
+{
+    gchar *temp=find_program(program_name);
+    if(temp){
+        g_free(temp);
+        return true;
+    }else{
+        return false;
+    }
+}
+
 
 gchar *seconds_to_string(unsigned int seconds)
 {
@@ -180,9 +194,6 @@ void widget_set_cursor(GtkWidget * widget, GdkCursorType cursor_type)
         gdk_cursor_unref(cursor);
 #endif
     }
-
-    while (gtk_events_pending())
-        gtk_main_iteration();
 }
 
 static gboolean __nonblock_cb(gpointer data)
@@ -310,11 +321,13 @@ void parameters_init(int *argc, char ***argv, ProgramParameters * param)
     static gint show_version = FALSE;
     static gint skip_benchmarks = FALSE;
     static gint quiet = FALSE;
+    static gchar *topic = NULL;
+    static gchar *topiccached = NULL;
     static gchar *report_format = NULL;
     static gchar *run_benchmark = NULL;
     static gchar *result_format = NULL;
     static gchar *bench_user_note = NULL;
-    static gint max_bench_results = 50;
+    static gint max_bench_results = 250;
 
     static GOptionEntry options[] = {
 	{
@@ -336,6 +349,18 @@ void parameters_init(int *argc, char ***argv, ProgramParameters * param)
 	 .arg_data = &report_format,
 	 .description = N_("chooses a report format ([text], html)")},
 	{
+	 .long_name = "topic",
+	 .short_name = 't',
+	 .arg = G_OPTION_ARG_STRING,
+	 .arg_data = &topic,
+	 .description = N_("search for a topic in CLI report (-t getlist shows available)")},
+	{
+	 .long_name = "topic-cache",
+	 .short_name = 'c',
+	 .arg = G_OPTION_ARG_STRING,
+	 .arg_data = &topiccached,
+	 .description = N_("search for a topic in Cached CLI report (-t getlist shows available)")},
+	{
 	 .long_name = "run-benchmark",
 	 .short_name = 'b',
 	 .arg = G_OPTION_ARG_STRING,
@@ -346,7 +371,7 @@ void parameters_init(int *argc, char ***argv, ProgramParameters * param)
 	 .short_name = 'u',
 	 .arg = G_OPTION_ARG_STRING,
 	 .arg_data = &bench_user_note,
-	 .description = N_("user note attached to benchmark results. (updating/synchronize with server)")},
+	 .description = N_("user note attached to benchmark results. Group-MachineName-ServerReq")},
 	{
 	 .long_name = "result-format",
 	 .short_name = 'g',
@@ -358,7 +383,7 @@ void parameters_init(int *argc, char ***argv, ProgramParameters * param)
 	 .short_name = 'n',
 	 .arg = G_OPTION_ARG_INT,
 	 .arg_data = &max_bench_results,
-	 .description = N_("maximum number of benchmark results to include (-1 for no limit, default is 50)")},
+	 .description = N_("maximum number of benchmark results to include (-1 for no limit, default is 250)")},
 	{
 	 .long_name = "version",
 	 .short_name = 'v',
@@ -396,6 +421,9 @@ void parameters_init(int *argc, char ***argv, ProgramParameters * param)
 	exit(1);
     }
 
+    if(topiccached) {param->topiccached=1;topic=topiccached;}
+    param->topic=topic;
+    if(topic) {create_report=1; skip_benchmarks=1;quiet=1;}
     param->create_report = create_report;
     param->report_format = REPORT_FORMAT_TEXT;
     param->show_version = show_version;
@@ -414,12 +442,24 @@ void parameters_init(int *argc, char ***argv, ProgramParameters * param)
             param->report_format = REPORT_FORMAT_SHELL;
     }
 
-    /* clean user note */
+    /* check user note */
     if (bench_user_note) {
-        char *p = NULL;
-        while( (p = strchr(bench_user_note, ';')) )  { *p = ','; }
-        param->bench_user_note =
-            gg_key_file_parse_string_as_value(bench_user_note, '|');
+        char *p = bench_user_note;
+	int ok=0,c=0;
+	//if( (*p!=0) && (*p!='-') ) ok=1;
+	if(*p!=0) ok=1;
+        while(ok && *p)  {
+	    if(*p=='-') c++;
+	    if(!isalpha(*p) && !isdigit(*p) && (*p!='-')) ok=0;
+	    p++;
+	}
+	if(c>2) ok=0;
+	if(strlen(bench_user_note)>50) ok=0;
+        if(ok) param->bench_user_note=bench_user_note;
+	if(!ok) {
+	    g_print(_("User Note invalid (letters+numbers Group-MachineName-ServerReq)\nUser Note params are optional and usernote can be left blank.\nHave only a group, group-MachineName and also a special request to server for the return benchmark data from server\n"));
+	    exit(1);
+	}
     }
 
     /* html ok?
@@ -463,12 +503,13 @@ gchar *strreplacechr(gchar * string, gchar * replace, gchar new_char)
 
     return string;
 }
-
+//Note: frees incomming string - use like st=strreplace(st,"saa","ac");
 gchar *strreplace(gchar *string, gchar *replace, gchar *replacement)
 {
     gchar **tmp, *ret;
 
     tmp = g_strsplit(string, replace, 0);
+    g_free(string);
     ret = g_strjoinv(replacement, tmp);
     g_strfreev(tmp);
 
@@ -492,15 +533,13 @@ static void module_register_methods(ShellModule * module)
 
 	for (methods = get_methods(); methods->name; methods++) {
 	    ShellModuleMethod method = *methods;
-	    gchar *name = g_path_get_basename(g_module_name(module->dll));
-	    gchar *simple_name = strreplace(name, "lib", "");
+	    gchar *simple_name = strreplace(g_path_get_basename(g_module_name(module->dll)), "lib", "");
 
 	    strend(simple_name, '.');
 
 	    method_name = g_strdup_printf("%s::%s", simple_name, method.name);
 	    g_hash_table_insert(__module_methods, method_name,
 				method.function);
-	    g_free(name);
 	    g_free(simple_name);
 	}
     }
@@ -510,26 +549,36 @@ static void module_register_methods(ShellModule * module)
 gchar *module_call_method(gchar * method)
 {
     gchar *(*function) (void);
+    gchar *f=NULL,*ret;
 
     if (__module_methods == NULL) {
 	return NULL;
     }
 
     function = g_hash_table_lookup(__module_methods, method);
-    return function ? g_strdup(function()) : NULL;
+    if(function) f=function();
+    ret=g_strdup(f);
+    g_free(f);
+
+    return ret;
 }
 
 /* FIXME: varargs? */
 gchar *module_call_method_param(gchar * method, gchar * parameter)
 {
     gchar *(*function) (gchar *param);
+    gchar *f=NULL,*ret;
 
     if (__module_methods == NULL) {
 	return NULL;
     }
 
     function = g_hash_table_lookup(__module_methods, method);
-    return function ? g_strdup(function(parameter)) : NULL;
+    if(function) f=function(parameter);
+    ret=g_strdup(f);
+    g_free(f);
+
+    return ret;
 }
 
 static gboolean remove_module_methods(gpointer key, gpointer value, gpointer data)
@@ -613,8 +662,8 @@ static ShellModule *module_load(gchar * filename)
 	gchar *tmpicon, *dot, *simple_name;
 
 	tmpicon = g_strdup(filename);
-	dot = g_strrstr(tmpicon, "." G_MODULE_SUFFIX);
 
+	dot = g_strrstr(tmpicon, "." G_MODULE_SUFFIX);
 	*dot = '\0';
 
 	simple_name = strreplace(tmpicon, "lib", "");
@@ -623,13 +672,12 @@ static ShellModule *module_load(gchar * filename)
 	module->icon = icon_cache_get_pixbuf(tmp);
 
 	g_free(tmp);
-	g_free(tmpicon);
 	g_free(simple_name);
     }
 
     tmp = g_build_filename(params.path_lib, "modules", filename, NULL);
     module->dll = g_module_open(tmp, G_MODULE_BIND_LAZY);
-    DEBUG("gmodule resource for ``%s'' is %p (%s)", tmp, module->dll, g_module_error());
+    //DEBUG("gmodule resource for ``%s'' is %p (%s)", tmp, module->dll, g_module_error());
     g_free(tmp);
 
     if (module->dll) {
@@ -647,7 +695,7 @@ static ShellModule *module_load(gchar * filename)
 	}
 
 	if (g_module_symbol(module->dll, "hi_module_init", (gpointer) & init)) {
-	    DEBUG("initializing module ``%s''", filename);
+	    //DEBUG("initializing module ``%s''", filename);
 	    init();
 	}
 
@@ -691,7 +739,7 @@ static ShellModule *module_load(gchar * filename)
 	    i++;
 	}
 
-	DEBUG("registering methods for module ``%s''", filename);
+	//DEBUG("registering methods for module ``%s''", filename);
 	module_register_methods(module);
     } else {
     	DEBUG("cannot g_module_open(``%s''). permission problem?", filename);
@@ -935,7 +983,7 @@ const gchar *module_entry_get_note(ShellModuleEntry * module_entry)
 
 gchar *h_strdup_cprintf(const gchar * format, gchar * source, ...)
 {
-    gchar *buffer, *retn;
+    gchar *buffer, *ret;
     va_list args;
 
     va_start(args, source);
@@ -943,14 +991,14 @@ gchar *h_strdup_cprintf(const gchar * format, gchar * source, ...)
     va_end(args);
 
     if (source) {
-	retn = g_strconcat(source, buffer, NULL);
+	ret = g_strconcat(source, buffer, NULL);
 	g_free(buffer);
         g_free(source);
     } else {
-	retn = buffer;
+	ret = buffer;
     }
 
-    return retn;
+    return ret;
 }
 
 gchar *h_strconcat(gchar * string1, ...)
@@ -1282,8 +1330,8 @@ gchar *strwrap(const gchar *st, size_t w, gchar delimiter)
 
   if(!st) return NULL;
 
-  //disable wrap for CLI
-  if(params.create_report) return g_strdup(st);
+  //disable wrap for CLI text
+  if(params.create_report && !(params.fmt_opts & FMT_OPT_HTML)) return g_strdup(st);
 
   while(((len=strlen(ist)) > 0) && (((rst-retst)+w+2)<MAX_STRWRAP)){
     if(len>w) len=w;

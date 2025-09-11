@@ -1,5 +1,5 @@
 /*
- *    HardInfo - Displays System Information
+ *    Hardinfo2 - System information and benchmark
  *    Copyright (C) 2003-2007 L. A. F. Pereira <l@tia.mat.br>
  *
  *    This program is free software; you can redistribute it and/or modify
@@ -153,7 +153,7 @@ extern gchar *gpu_summary;
 const gchar *get_gpu_summary() {
     if (gpu_summary == NULL)
         scan_gpu(FALSE);
-    return gpu_summary;
+    return g_strdup(gpu_summary);
 }
 
 static gint proc_cmp_model_name(Processor *a, Processor *b) {
@@ -258,6 +258,72 @@ gchar *processor_describe_by_counting_names(GSList * processors)
     return ret;
 }
 
+//currently only 64bit x86 has ld caps
+#ifdef ARCH_x86
+#define PTR_BITS ((unsigned int)sizeof(void*) * 8)
+#else
+#define PTR_BITS 32
+#endif
+gchar *ldlinux_hwcaps() {
+    gboolean spawned;
+    gchar *cmd_line,*out=NULL,*err=NULL,*supported=g_strdup("");
+
+    if(PTR_BITS==64){//64bit
+        cmd_line=g_strdup("sh -c 'LC_ALL=C /usr/lib64/ld-linux-x86-64.so.2 --help'");
+	spawned = g_spawn_command_line_sync(cmd_line, &out, &err, NULL, NULL);
+	g_free(cmd_line);
+	if (!spawned || strlen(out)<100) {
+	   if(out) {g_free(out);out=NULL;}
+	   if(err) {g_free(err);err=NULL;}
+	   cmd_line=g_strdup("sh -c 'LC_ALL=C /lib64/ld-linux-x86-64.so.2 --help'");
+	   spawned = g_spawn_command_line_sync(cmd_line, &out, &err, NULL, NULL);
+	   g_free(cmd_line);
+	}
+	if (spawned && strlen(out)>=100) {
+	    if(strstr(out,"x86-64-v1 (sup")) supported=g_strconcat(supported," x86-64-V1 ",NULL);
+	    if(strstr(out,"x86-64-v2 (sup")) supported=g_strconcat(supported," x86-64-V2 ",NULL);
+	    if(strstr(out,"x86-64-v3 (sup")) supported=g_strconcat(supported," x86-64-V3 ",NULL);
+	    if(strstr(out,"x86-64-v4 (sup")) supported=g_strconcat(supported," x86-64-V4 ",NULL);
+	    if(strstr(out,"x86-64-v5 (sup")) supported=g_strconcat(supported," x86-64-V5 ",NULL);//future
+	    if(strlen(supported)<1) supported=g_strconcat(supported," x86-64-V1 ",NULL);
+	} else {
+	    supported=g_strconcat(supported," x86-64-V1 ",NULL);
+	}
+    } else {//32bit and others
+        cmd_line=g_strdup("sh -c 'LC_ALL=C uname -m'");
+	spawned = g_spawn_command_line_sync(cmd_line, &out, &err, NULL, NULL);
+	g_free(cmd_line);
+	if (spawned && strlen(out)>=1) {
+	    supported=g_strconcat(supported, " ",out," ", NULL);
+	}else{
+	    supported=g_strconcat(supported, " ",HARDINFO2_ARCH," ", NULL);
+	}
+    }
+    if(out) g_free(out);
+    if(err) g_free(err);
+
+    if(strlen(supported)<1) {
+        g_free(supported);
+        supported=g_strdup("(None)");
+    }
+
+    return supported;
+}
+
+gchar *ldlinux_hwcaps_info() {
+    gchar *supported=ldlinux_hwcaps();
+
+    gchar *ret = g_strdup_printf("[%s]\n"
+			  "HWCAPS=  %s\n",
+			  _("Distro and CPU Supported Profiles"),
+			  supported
+			  );
+    g_free(supported);
+
+    return ret;
+}
+
+
 gchar *get_processor_name(void)
 {
     scan_processors(FALSE);
@@ -287,7 +353,7 @@ gchar *get_storage_devices_simple(void)
 
     struct Info *info = info_unflatten(storage_list);
     if (!info) {
-        return "";
+        return g_strdup("");
     }
 
     guint i, fi;
@@ -320,13 +386,96 @@ gchar *get_storage_devices_simple(void)
     return storage_devs;
 }
 
+gchar *get_storage_home_models(void)
+{
+    scan_storage(FALSE);
+
+    if (!storage_list) return g_strdup("");
+
+    gchar *p,*np,*tmp,*p2;
+    GRegex *regex;
+    gchar *homepath=NULL,*out=NULL,*err=NULL;
+    gboolean spawned;
+    const char cmd_line[] = "sh -c 'cd ~;df --output=source . |tail -1'";
+    const char cmd_line1disk[] = "sh -c 'lsblk -l |grep disk|grep -v zram'";
+    char cmd_lineblk[100];
+
+    //lookup home disk by df - only works on newer machines
+    spawned = g_spawn_command_line_sync(cmd_line, &out, &err, NULL, NULL);
+    if(spawned && out){
+        if(strstr(out,"/dev/") && !strstr(out,"mapper") && !strstr(out,"/dev/root") ) homepath=strdup(out+5);
+	if(strstr(out,"mapper")) {
+	    p=strstr(out,"\n");
+	    *p=0;
+	    sprintf(cmd_lineblk,"sh -c 'lsblk -l -s %s|tail -1'",out);
+	    g_free(out);
+	    g_free(err);
+            spawned = g_spawn_command_line_sync(cmd_lineblk, &out, &err, NULL, NULL);
+	    if(spawned && out){
+	        p=strstr(out," ")+1;//note: field 4 is size
+	        *p=0;
+	        homepath=g_strdup(out);
+	    }
+	}
+    }
+    g_free(out);
+    g_free(err);
+
+    if(!homepath) {  //simple systems - only 1 disk
+        spawned = g_spawn_command_line_sync(cmd_line1disk, &out, &err, NULL, NULL);
+        if(spawned && out){
+	    if(strstr(out,"disk") && (strstr(out,"\n")==(out+strlen(out)-1)) ) {
+	        p=strstr(out," ")+1;//note: field 4 is size
+		*p=0;
+                homepath=strdup(out);
+	    }
+        }
+        g_free(out);
+        g_free(err);
+    }
+    if(!homepath) return g_strdup("NoHomePath");
+    homepath[strlen(homepath)-1]=0;
+    while(homepath[strlen(homepath)-1]>='0' && homepath[strlen(homepath)-1]<='9') homepath[strlen(homepath)-1]=0;
+    if( !strstr(homepath,"sdp") && !strstr(homepath,"vdp") && (homepath[strlen(homepath)-1]=='p') ) homepath[strlen(homepath)-1]=0;
+    //printf("Homepath=%s (%u)\n",homepath,(unsigned int)strlen(homepath));
+
+    regex = g_regex_new ("<.*?>", 0, 0, NULL);
+    p2=p=g_strdup(storage_list);
+    while ( (np=strstr(p,"\n")) ){
+      *np=0;
+      //printf("name=%s\n",p);
+      if(strstr(p,homepath)) {
+	  tmp = g_regex_replace(regex, strstr(p,"=")+1, -1, 0, "", 0, NULL); // remove html tags
+	  tmp = g_strstrip(strreplace(tmp,"  "," "));
+	  tmp = g_strstrip(strreplace(tmp,"| ","|"));
+	  p=strstr(tmp,"|");
+	  *p=0;
+	  p++;
+          g_regex_unref(regex);
+          g_free(homepath);
+	  p=g_strdup(p);
+	  g_free(p2);
+          //printf("Homepathmodel=%s\n",g_strdup_printf("%s (%s)",p,tmp));
+	  //return g_strdup_printf("%s (%s)",p,tmp);
+          //printf("Homepathmodel=%s\n",p);
+	  return p;
+      }
+      p=np+1;
+    }
+
+    g_regex_unref(regex);
+    g_free(homepath);
+    g_free(p2);
+    return g_strdup("HomePathNotFound");
+}
+
 gchar *get_storage_devices_models(void)
 {
     scan_storage(FALSE);
 
     struct Info *info = info_unflatten(storage_list);
     if (!info) {
-        return "";
+      return g_strdup("");
     }
 
     guint i, fi;
@@ -367,28 +516,24 @@ gchar *get_storage_devices_models(void)
 gchar *get_storage_devices(void)
 {
     scan_storage(FALSE);
-
-    return storage_list;
+    return g_strdup(storage_list);
 }
 
 gchar *get_printers(void)
 {
     scan_printers(FALSE);
-
-    return printer_list;
+    return g_strdup(printer_list);
 }
 
 gchar *get_input_devices(void)
 {
     scan_input(FALSE);
-
-    return input_list;
+    return g_strdup(input_list);
 }
 
 gchar *get_processor_count(void)
 {
     scan_processors(FALSE);
-
     return g_strdup_printf("%d", g_slist_length(processors));
 }
 
@@ -595,12 +740,10 @@ gchar *get_motherboard(void)
 
     if (board_part && product_part) {
         ret = g_strdup_printf("%s (%s)", board_part, product_part);
-        g_free(board_part);
-        g_free(product_part);
     } else if (board_part)
-        ret = board_part;
+        ret = g_strdup(board_part);
     else if (product_part)
-        ret = product_part;
+        ret = g_strdup(product_part);
     else {
         if(strstr(module_call_method("computer::getOSKernel"),"WSL2")){
 	    ret = g_strdup(_("WSL2"));
@@ -608,6 +751,9 @@ gchar *get_motherboard(void)
             ret = g_strdup(_("(Unknown)"));
 	}
     }
+    g_free(board_part);
+    g_free(product_part);
+
     g_free(board_name);
     g_free(board_vendor);
     g_free(board_version);
@@ -635,9 +781,11 @@ const ShellModuleMethod *hi_exported_methods(void)
         {"getProcessorNameAndDesc", get_processor_name_and_desc},
         {"getProcessorFrequency", get_processor_max_frequency},
         {"getProcessorFrequencyDesc", get_processor_frequency_desc},
+        {"getProcessorHwCaps", ldlinux_hwcaps},
         {"getStorageDevices", get_storage_devices},
         {"getStorageDevicesSimple", get_storage_devices_simple},
         {"getStorageDevicesModels", get_storage_devices_models},
+        {"getStorageHomeModels", get_storage_home_models},
         {"getPrinters", get_printers},
         {"getInputDevices", get_input_devices},
         {"getMotherboard", get_motherboard},
@@ -687,6 +835,7 @@ void scan_dmi_mem(gboolean reload)
     gchar *st=memory_devices_get_system_memory_str();
     if(st) {
         memory_devices_desc = g_strdup_printf("%s %s",st,memory_devices_get_system_memory_types_str());
+	g_free(st);
     } else {
         memory_devices_desc = NULL;
     }
@@ -914,7 +1063,7 @@ ModuleEntry *hi_module_get_entries(void)
 
 gchar *hi_module_get_name(void)
 {
-    return g_strdup(_("Devices"));
+    return _("Devices");
 }
 
 guchar hi_module_get_weight(void)

@@ -95,7 +95,7 @@ gchar *format_with_ansi_color(const gchar *str, const gchar *ansi_color, int fmt
         if (fmt_opts & FMT_OPT_PANGO)
             ret = g_strdup_printf("<span background=\"%s\" color=\"%s\"><b> %s </b></span>", html_color_bg, html_color_fg, str);
         else if (fmt_opts & FMT_OPT_HTML)
-            ret = g_strdup_printf("<span style=\"background-color: %s; color: %s;\"><b>&nbsp;%s&nbsp;</b></span>", html_color_bg, html_color_fg, str);
+            ret = g_strdup("");
     }
 
 format_with_ansi_color_end:
@@ -120,11 +120,24 @@ void tag_vendor(gchar **str, guint offset, const gchar *vendor_str, const char *
     }
 }
 
+static gchar *lastvendor=NULL;
+static gchar *lasttag=NULL;
+static int lastfmt=-1;
 gchar *vendor_match_tag(const gchar *vendor_str, int fmt_opts) {
+    if(!vendor_str || strlen(vendor_str)<1) return NULL;
+
+    if(lastvendor && (lastfmt==fmt_opts) && (strcmp(vendor_str, lastvendor)==0) ){
+        if(lasttag) return g_strdup(lasttag);
+        return NULL;
+    }
+    if(lastvendor) {g_free(lastvendor);g_free(lasttag);lasttag=NULL;}
+    lastvendor=g_strdup(vendor_str);
+    lastfmt=fmt_opts;
     const Vendor *v = vendor_match(vendor_str, NULL);
     if (v) {
         gchar *ven_tag = v->name_short ? g_strdup(v->name_short) : g_strdup(v->name);
         tag_vendor(&ven_tag, 0, ven_tag, v->ansi_color, fmt_opts);
+	lasttag=g_strdup(ven_tag);
         return ven_tag;
     }
     return NULL;

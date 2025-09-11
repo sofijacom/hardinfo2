@@ -498,9 +498,10 @@ void __scan_scsi_devices(void)
     int otype = 0;
     if ((proc_scsi = fopen("/proc/scsi/scsi", "r"))) {
         otype = 1;
-      } else if ((proc_scsi = popen("lsscsi -c", "r"))) {
+	/*Below is only for very old distros*/
+    } /*else if ( find_program("lsscsi") && (proc_scsi = popen("lsscsi -c", "r")) ) {
         otype = 2;
-    }
+    }*/
 
     if (otype) {
         while (fgets(buffer, 256, proc_scsi)) {
@@ -597,8 +598,8 @@ void __scan_scsi_devices(void)
         }
         if (otype == 1)
             fclose(proc_scsi);
-        else if (otype == 2)
-            pclose(proc_scsi);
+        /*else if (otype == 2)
+	    pclose(proc_scsi);*/
     }
 
     if (n) {

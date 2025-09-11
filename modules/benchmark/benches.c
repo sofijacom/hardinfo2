@@ -28,7 +28,8 @@ gchar *CN() { \
     return benchmark_include_results(bench_results[BID], BN); \
 }
 
-#if(HARDINFO2_QT5)
+static ModuleEntry entries[];
+
 #define BENCH_SCAN_SIMPLE(SN, BF, BID, BN)	\
 void SN(gboolean reload) { \
     static gboolean scanned=FALSE; \
@@ -36,22 +37,10 @@ void SN(gboolean reload) { \
     if(reload || bench_results[BID].result<=0.0) scanned = FALSE; \
     if(reload){DEBUG("BENCH SCAN RELOAD %s\n",BN);} else if(scanned) {DEBUG("BENCH SCAN OK %s\n",BN);}else{DEBUG("BENCH SCAN %s\n",BN);} \
     if(scanned) return; \
-    if(BID!=BENCHMARK_OPENGL || params.gui_running || params.run_benchmark) \
+    if(!(entries[BID].flags & MODULE_FLAG_NO_REMOTE) || params.gui_running || params.run_benchmark) \
         do_benchmark(BF, BID); \
     scanned = TRUE; \
 }
-#else
-#define BENCH_SCAN_SIMPLE(SN, BF, BID, BN)	\
-void SN(gboolean reload) { \
-    static gboolean scanned=FALSE; \
-    if(params.aborting_benchmarks) return; \
-    if(reload || bench_results[BID].result<=0.0) scanned = FALSE; \
-    if(reload){DEBUG("BENCH SCAN RELOAD %s\n",BN);} else if(scanned) {DEBUG("BENCH SCAN OK %s\n",BN);}else{DEBUG("BENCH SCAN %s\n",BN);} \
-    if(scanned) return; \
-    do_benchmark(BF, BID); \
-    scanned = TRUE; \
-}
-#endif
 
 #define BENCH_SIMPLE(BID, BN, BF, R) \
     BENCH_CALLBACK(callback_##BF, BN, BID, R); \
@@ -70,6 +59,9 @@ BENCH_SIMPLE(BENCHMARK_CRYPTOHASH, "CPU CryptoHash", benchmark_cryptohash, 1);
 BENCH_SIMPLE(BENCHMARK_IPERF3_SINGLE, "Internal Network Speed", benchmark_iperf3_single, 1);
 #if(HARDINFO2_QT5)
 BENCH_SIMPLE(BENCHMARK_OPENGL, "GPU OpenGL Drawing", benchmark_opengl, 1);
+#endif
+#if(HARDINFO2_VK)
+BENCH_SIMPLE(BENCHMARK_VULKAN, "GPU Vulkan Drawing", benchmark_vulkan, 1);
 #endif
 BENCH_SIMPLE(BENCHMARK_SBCPU_SINGLE, "SysBench CPU (Single-thread)", benchmark_sbcpu_single, 1);
 BENCH_SIMPLE(BENCHMARK_SBCPU_ALL, "SysBench CPU (Multi-thread)", benchmark_sbcpu_all, 1);
@@ -127,8 +119,41 @@ static char *entries_english_name[] = {
 #if(HARDINFO2_QT5)
 	    ,"GPU OpenGL Drawing"
 #endif
+#if(HARDINFO2_VK)
+	    ,"GPU Vulkan Drawing"
+#endif
 	    ,"Storage R/W Speed"
 	    ,"Cache/Memory"
+};
+
+//Note: Same order as entries
+static int entries_btimer[] = {
+    7,//"CPU Blowfish (Single-thread)",
+    7,//"CPU Blowfish (Multi-thread)",
+    7,//"CPU Blowfish (Multi-core)",
+    7,//"CPU Zlib",
+    5,//"CPU CryptoHash",
+    5,//"CPU Fibonacci",
+    5,//"CPU N-Queens",
+    5,//"FPU FFT",
+    5,//"FPU Raytracing (Single-thread)",
+    10,//"Internal Network Speed",
+    7,//"SysBench CPU (Single-thread)",
+    7,//"SysBench CPU (Multi-thread)",
+    7,//"SysBench CPU (Four threads)",
+    7,//"SysBench Memory (Single-thread)",
+    7,//"SysBench Memory (Two threads)",
+    7,//"SysBench Memory (Quad threads)",
+    7,//"SysBench Memory (Multi-thread)",
+    15,//"GPU Drawing"
+#if(HARDINFO2_QT5)
+    4,//,"GPU OpenGL Drawing"
+#endif
+#if(HARDINFO2_VK)
+    3,//,"GPU Vulkan Drawing"
+#endif
+    4,//,"Storage R/W Speed"
+    5,//,"Cache/Memory"
 };
 
 
@@ -287,6 +312,16 @@ static ModuleEntry entries[] = {
             MODULE_FLAG_BENCHMARK|MODULE_FLAG_NO_REMOTE,
         },
 #endif
+#if(HARDINFO2_VK)
+    [BENCHMARK_VULKAN] =
+        {
+            N_("GPU Vulkan Drawing"),
+            "gpu.svg",
+            callback_benchmark_vulkan,
+            scan_benchmark_vulkan,
+            MODULE_FLAG_BENCHMARK|MODULE_FLAG_NO_REMOTE,
+        },
+#endif
     [BENCHMARK_STORAGE] =
         {
             N_("Storage R/W Speed"),
@@ -311,17 +346,14 @@ const gchar *hi_note_func(gint entry)
     case BENCHMARK_SBCPU_SINGLE:
     case BENCHMARK_SBCPU_QUAD:
     case BENCHMARK_SBCPU_ALL:
-        return _("Alexey Kopytov's <i><b>sysbench</b></i> is required.\n"
-                 "Results in events/second. Higher is better.");
+        return _("Results in events/second. Higher is better.");
     case BENCHMARK_MEMORY_SINGLE:
     case BENCHMARK_MEMORY_DUAL:
     case BENCHMARK_MEMORY_QUAD:
     case BENCHMARK_MEMORY_ALL:
-        return _("Alexey Kopytov's <i><b>sysbench</b></i> is required.\n"
-                 "Results in MiB/second. Higher is better.");
+        return _("Results in MiB/second. Higher is better.");
     case BENCHMARK_IPERF3_SINGLE:
-        return _("<i><b>iperf3</b></i> is required.\n"
-                 "Results in Gbits/s. Higher is better.");
+        return _("Results in Gbits/s. Higher is better.");
     case BENCHMARK_CRYPTOHASH:
     case BENCHMARK_BLOWFISH_SINGLE:
     case BENCHMARK_BLOWFISH_THREADS:
@@ -340,6 +372,10 @@ const gchar *hi_note_func(gint entry)
         return _("Results in MB/s. Higher is better.");
 #if(HARDINFO2_QT5)
     case BENCHMARK_OPENGL:
+        return _("Results in FPS. Higher is better.");
+#endif
+#if(HARDINFO2_VK)
+    case BENCHMARK_VULKAN:
         return _("Results in FPS. Higher is better.");
 #endif
     }

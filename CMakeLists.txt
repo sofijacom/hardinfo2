@@ -15,17 +15,30 @@ else()
 endif()
 project(hardinfo2)
 
-set(HARDINFO2_VERSION "2.2.5")
+#Release settings
+set(HARDINFO2_VERSION "2.2.14")
+set(HARDINFO2_RELEASE_DATE "2025-05-08")
+set(HARDINFO2_RELEASE_NOTE_HTML "<p>Development</p><p>\nImprovements\nLots of minor fixes/maintenance/updates/cleanup\nFor details see homepage news.</p>")
 
+#Build settings
 option(HARDINFO2_SERVICE "Build with service support" 1)
 option(HARDINFO2_GTK3 "Build for GTK3 (0/off for GTK2)" 1)
 option(HARDINFO2_LIBSOUP3 "Build for libsoup-3.0 (0/off for libsoup-2.4)" 1)
-option(HARDINFO2_QT5 "Build opengl benchmark for QT5 " 1)
+option(HARDINFO2_QT5 "Build opengl benchmark for QT5" 1)
+option(HARDINFO2_QT5_MOCQT5 "Build QT5 with moc-qt5" 0)
+option(HARDINFO2_VK "Build vulkan benchmark" 1)
+option(HARDINFO2_VK_WAYLAND "Build Vulkan with wayland support" 1)
+option(HARDINFO2_VK_X11 "Build Vulkan with X11 support" 1)
+option(HARDINFO2_NOSSL "Build for very old distro with no https" 0)
 
 SET(CMAKE_INSTALL_PREFIX "/usr")
 SET(HARDINFO2_SYSTEMV 0)
 SET(HARDINFO2_RUNIT 0)
+string(SUBSTRING ${HARDINFO2_RELEASE_DATE} 0 4 HARDINFO2_RELEASE_YEAR)
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/tools/org.hardinfo2.hardinfo2.metainfo.xml" METAINFO_CONTENT)
+string(REPLACE "VERSION" "${HARDINFO2_VERSION}" METAINFO_CONTENT "${METAINFO_CONTENT}" )
+string(REPLACE "RELEASE_DATE" "${HARDINFO2_RELEASE_DATE}" METAINFO_CONTENT "${METAINFO_CONTENT}" )
+string(REPLACE "DESCRIPTION" "${HARDINFO2_RELEASE_NOTE_HTML}" METAINFO_CONTENT "${METAINFO_CONTENT}" )
 
 SET(CMAKE_MODULE_PATH  "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(GNUInstallDirs)
@@ -46,7 +59,7 @@ elseif(${CMAKE_SYSTEM_PROCESSOR} MATCHES "(mips|mips64el)")
 	set(HARDINFO2_ARCH "mips")
 elseif(${CMAKE_SYSTEM_PROCESSOR} MATCHES "parisc.*")
 	set(HARDINFO2_ARCH "parisc")
-elseif(${CMAKE_SYSTEM_PROCESSOR} MATCHES "sparc{32,64}")
+elseif(${CMAKE_SYSTEM_PROCESSOR} MATCHES "sparc32|sparc64")
 	set(HARDINFO2_ARCH "sparc")
 elseif(${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm.*")
 	set(HARDINFO2_ARCH "arm")
@@ -86,8 +99,8 @@ add_definitions("-Wformat-security")
 
 set(PACKAGE_LIBSOUP2_MINVERSION 2.42)
 set(PACKAGE_LIBGLIB2_MINVERSION 2.24)
-SET(RPM_REQ "sysbench, udisks2, glx-utils, lm_sensors, xdg-utils, iperf3, fwupd, xrandr, vulkan-tools")
-SET(DEB_REQ "sysbench, udisks2, mesa-utils, lm-sensors, xdg-utils, iperf3, fwupd, x11-xserver-utils, vulkan-tools")
+SET(RPM_REQ "dmidecode, sysbench, udisks2, glx-utils, lm_sensors, xdg-utils, iperf3, fwupd, xrandr, vulkan-tools, gawk")
+SET(DEB_REQ "dmidecode, sysbench, udisks2, mesa-utils, lm-sensors, xdg-utils, iperf3, fwupd, x11-xserver-utils, vulkan-tools, gawk")
 
 #########################CPack PACKAGING SETUP###############################
 if(EXISTS "/etc/os-release")
@@ -117,6 +130,8 @@ string(REGEX REPLACE "/" "" disversion "${disversion}")
 string(REGEX REPLACE " " "" disversion "${disversion}")
 #RPM Distro's
 if(${distro} MATCHES "Alma*" OR ${distro} MATCHES "Rocky*" OR ${distro} MATCHES "Fedora*" OR ${distro} MATCHES "RedHat*" OR ${distro} MATCHES "CentOS*" OR ${distro} MATCHES "Oracle*" OR ${distro} MATCHES "openSUSE*" OR ${distro} MATCHES "SUSE*" OR ${distro} MATCHES "PCLinuxOS*" OR ${distro} MATCHES "Ultramarine*" OR ${distro} MATCHES "Nobara*" OR ${distro} MATCHES "OpenMandriva*")
+  #ALT Linux is RPM but too old rpmbuild - use alien until fixed
+  # OR ${distro} MATCHES "ALT*" OR ${distro} MATCHES "SimplyLinux"
   set(RPM 1)
 endif()
 #Arch Distro's (tgz)
@@ -164,23 +179,26 @@ endif()
 #centos/redhat/oracle/opensuse/suse ->8
 if(${disversion} LESS 8.99)
   if(${distro} MATCHES "Red*" OR ${distro} MATCHES "CentOS*" OR ${distro} MATCHES "Oracle*" OR ${distro} MATCHES "openSUSE*" OR ${distro} MATCHES "Alma*" OR ${distro} MATCHES "Rocky*")
-    message("Centos/Redhat/oracle/opensuse/suse/rocky/alma ->8 - Old Appstream metainfo")
+    message("Centos/Redhat/oracle/opensuse/suse/rocky/alma ->8 - Old Appstream metainfo VK_WAYLAND=0")
+    SET(HARDINFO2_VK_WAYLAND 0)
     string(REPLACE "<url type=\"contact\">https://github.com/hardinfo2/hardinfo2/discussions</url>" "" METAINFO_CONTENT "${METAINFO_CONTENT}" )
   endif()
 endif()
 
-#centos/redhat/oracle 10
+#centos/redhat/oracle/alma/rocky 10
+#note upgrade to 10.1 for sysbench to be available
 if((${disversion} GREATER_EQUAL 10) AND (${disversion} LESS 10.99))
   if(${distro} MATCHES "Red*" OR ${distro} MATCHES "CentOS*" OR ${distro} MATCHES "Oracle*" OR ${distro} MATCHES "Alma*" OR ${distro} MATCHES "Rocky*")
-    message("Centos/Redhat/oracle/rocky/alma 10 - Missing xrandr+sysbench!!!")
-    SET(RPM_REQ "udisks2, glx-utils, lm_sensors, xdg-utils, iperf3, fwupd, vulkan-tools") #miss sysbench, xrandr
+    message("Centos/Redhat/oracle/rocky/alma 10 - Missing xrandr vue to wayland standard")
+    SET(RPM_REQ "dmidecode, sysbench, udisks2, glx-utils, lm_sensors, xdg-utils, iperf3, fwupd, vulkan-tools, gawk") #miss xrandr
   endif()
 endif()
 
 #centos/redhat/oracle/opensuse/suse 7
 if(${disversion} LESS 7.99)
   if((${distro} MATCHES "Red*" OR ${distro} MATCHES "CentOS*" OR ${distro} MATCHES "Oracle*" OR ${distro} MATCHES "openSUSE*" OR ${distro} MATCHES "SUSE*"))
-      SET(RPM_REQ "sysbench, udisks2, glx-utils, lm_sensors, xdg-utils, iperf3, fwupd, xrandr") #miss vulkan-tools
+      SET(RPM_REQ "dmidecode, sysbench, udisks2, glx-utils, lm_sensors, xdg-utils, iperf3, fwupd, xrandr, gawk") #miss vulkan-tools
+      set(HARDINFO2_VK 0)
   endif()
 endif()
 
@@ -195,25 +213,37 @@ if(${disversion} LESS 6.99)
     message("RPM EL6 - LS24 - deprecated version 2.34.3 - but ok")
     set(PACKAGE_LIBSOUP2_MINVERSION 2.34.3)
     set(HARDINFO2_SYSTEMV 1)
-    message("RPM EL6 - no QT5 - Disabling opengl benchmarks")
+    message("RPM EL6 - no QT5+VK - Disabling benchmarks")
     set(HARDINFO2_QT5 0)
-    SET(RPM_REQ "sysbench, glx-utils, lm_sensors, xdg-utils, xrandr") #miss vulkan-tools, udisks2, fwupd, iperf3
+    set(HARDINFO2_VK 0)
+    message("RPM EL6 - NOSSL too old for https")
+    set(HARDINFO2_NOSSL 1)
+    SET(RPM_REQ "dmidecode, sysbench, glx-utils, lm_sensors, xdg-utils, xrandr, gawk") #miss vulkan-tools, udisks2, fwupd, iperf3
   endif()
 endif()
 
-#opensuse tumbeweed
-if(${disversion} GREATER 20000101)
-  if(${distro} MATCHES "openSUSE*")
-    SET(RPM_REQ "sysbench, udisks2, xdg-utils, fwupd, xrandr,vulkan-tools,  Mesa-demo-x, iperf, sensors") 
+#opensuse
+if(${distro} MATCHES "openSUSE*")
+  SET(RPM_REQ "dmidecode, sysbench, udisks2, xdg-utils, fwupd, xrandr,vulkan-tools,  Mesa-demo-x, iperf, sensors, gawk")
+  #opensuse tumbeweed
+  if(${disversion} GREATER 20000101)
+  else()
+    #opensuse leap 16
+    if(${disversion} GREATER 15.99)
+       SET(RPM_REQ "dmidecode, sysbench, udisks2, xdg-utils, xrandr,vulkan-tools,  Mesa-demo-x, iperf, sensors, gawk") #Some error for fwupd vs KDE6 dependencies
+    endif()
   endif()
 endif()
 
 
 #Fedora 23
 if(${distro}${disversion} MATCHES "Fedora23")
-    message("FC23 - no QT5 - Disabling opengl benchmarks")
+    message("FC23 - no QT5+VK - Disabling benchmarks")
     set(HARDINFO2_QT5 0)
-    SET(RPM_REQ "sysbench, udisks2, glx-utils, lm_sensors, xdg-utils, iperf3, fwupd, xrandr") #miss vulkan-tools
+    set(HARDINFO2_VK 0)
+    message("Fedora 23 - Too Old for HTTPS")
+    set(HARDINFO2_NOSSL 1)
+    SET(RPM_REQ "dmidecode, sysbench, udisks2, glx-utils, lm_sensors, xdg-utils, iperf3, fwupd, xrandr, gawk") #miss vulkan-tools
     message("Fedora 23 - Too Old for Appstream metainfo")
     string(REPLACE "<component type=\"desktop-application\">" "<component>" METAINFO_CONTENT "${METAINFO_CONTENT}" )
     string(REPLACE "<url type=\"contact\">https://github.com/hardinfo2/hardinfo2/discussions</url>" "" METAINFO_CONTENT "${METAINFO_CONTENT}" )
@@ -224,13 +254,16 @@ endif()
 #debian 7
 if(${distro}${disversion} MATCHES "DebianGNULinux7")
     message("DEB 7 - GTK2 to avoid c11 for ubergraph - deprecated - support will end at any time")
-    message("DEB 7 - LS24 - deprecated version 2.34.3 - but ok")
-    message("DEB 7 - no QT5 - Disabling opengl benchmarks")
     set(HARDINFO2_GTK3 0)
+    message("DEB 7 - LS24 - deprecated version 2.34.3 - but ok")
     set(PACKAGE_LIBSOUP2_MINVERSION 2.34.3)
-    set(HARDINFO2_SYSTEMV 1)
+    message("DEB 7 - no QT5+VK - Disabling benchmarks")
     set(HARDINFO2_QT5 0)
-    SET(DEB_REQ "sysbench, mesa-utils, lm-sensors, xdg-utils, x11-xserver-utils") #miss vulkan-tools,fwupd, udisks2, iperf3
+    set(HARDINFO2_VK 0)
+    message("DEB 7 - NOSSL too old for https")
+    set(HARDINFO2_NOSSL 1)
+    set(HARDINFO2_SYSTEMV 1)
+    SET(DEB_REQ "dmidecode, sysbench, mesa-utils, lm-sensors, xdg-utils, x11-xserver-utils, libsigsegv2, gawk") #miss vulkan-tools,fwupd, udisks2, iperf3 +libsigsegv2 for gawk
 endif()
 
 #debian 8
@@ -238,7 +271,8 @@ if(${distro}${disversion} MATCHES "DebianGNULinux8")
     message("DEB 8 - GTK3 version 3.14.5 is low - Themes disabled")
     message("DEB 8 - no QT5 - Disabling opengl benchmarks")
     set(HARDINFO2_QT5 0)
-    SET(DEB_REQ "sysbench, udisks2, mesa-utils, lm-sensors, xdg-utils, iperf3, x11-xserver-utils") #miss vulkan-tools,fwupd
+    set(HARDINFO2_VK 0)
+    SET(DEB_REQ "dmidecode, sysbench, udisks2, mesa-utils, lm-sensors, xdg-utils, iperf3, x11-xserver-utils, libsigsegv2, gawk") #miss vulkan-tools,fwupd +libsigsegv2 for gawk
 endif()
 
 #debian 9
@@ -247,24 +281,27 @@ else()
     if(${distro}${disversion} MATCHES "DebianGNULinux9")
         message("DEB 9 - QT5 too low - Disabling opengl benchmarks")
         set(HARDINFO2_QT5 0)
-	SET(DEB_REQ "sysbench, udisks2, mesa-utils, lm-sensors, xdg-utils, iperf3, fwupd, x11-xserver-utils") #miss vulkan-tools
+        set(HARDINFO2_VK 0)
+	SET(DEB_REQ "dmidecode, sysbench, udisks2, mesa-utils, lm-sensors, xdg-utils, iperf3, fwupd, x11-xserver-utils, gawk") #miss vulkan-tools
     endif()
 endif()
 
 #debian 10
 if(${distro}${disversion} MATCHES "DebianGNULinux10")
-  SET(DEB_REQ "udisks2, mesa-utils, lm-sensors, xdg-utils, iperf3, fwupd, x11-xserver-utils, vulkan-tools") #miss sysbench
+  SET(DEB_REQ "dmidecode, udisks2, mesa-utils, lm-sensors, xdg-utils, iperf3, fwupd, x11-xserver-utils, vulkan-tools, gawk") #miss sysbench
 endif()
 
 #debian ->11
 if(${disversion} LESS 11.99)
   if(${distro} MATCHES "DebianGNULinux")
-    message("DEB ->11 - LS24")
+    message("DEB ->11 - LS24 VK_WAYLAND=0")
     set(HARDINFO2_LIBSOUP3 0)
+    set(HARDINFO2_VK_WAYLAND 0)
   endif()
   if(${distro} MATCHES "RaspbianGNULinux")
-    message("DEB ->11 - LS24")
+    message("DEB ->11 - LS24 VK_WAYLAND=0")
     set(HARDINFO2_LIBSOUP3 0)
+    set(HARDINFO2_VK_WAYLAND 0)
   endif()
 endif()
 
@@ -278,9 +315,10 @@ endif()
 
 #ubuntu 16
 if(${distro}${disversion} MATCHES "Ubuntu16")
-    message("Ubuntu 16 - no QT5 - Disabling opengl benchmarks")
+    message("Ubuntu 16 - no QT5 - Disabling opengl+vulkan benchmarks")
+    set(HARDINFO2_VK 0)
     set(HARDINFO2_QT5 0)
-    SET(DEB_REQ "sysbench, udisks2, mesa-utils, lm-sensors, xdg-utils, iperf3, fwupd, x11-xserver-utils") #miss vulkan-tools
+    SET(DEB_REQ "dmidecode, sysbench, udisks2, mesa-utils, lm-sensors, xdg-utils, iperf3, fwupd, x11-xserver-utils, gawk") #miss vulkan-tools
     message("ubuntu 16 - Old Appstream metainfo")
     string(REPLACE "<url type=\"contact\">https://github.com/hardinfo2/hardinfo2/discussions</url>" "" METAINFO_CONTENT "${METAINFO_CONTENT}" )
     string(REPLACE "<url type=\"translate\">https://github.com/hardinfo2/hardinfo2/tree/master/po</url>" "" METAINFO_CONTENT "${METAINFO_CONTENT}" )
@@ -288,39 +326,58 @@ endif()
 
 #ubuntu 18
 if(${distro}${disversion} MATCHES "Ubuntu18")
-    SET(DEB_REQ "sysbench, udisks2, mesa-utils, lm-sensors, xdg-utils, iperf3, fwupd, x11-xserver-utils") #miss vulkan-tools
-    message("ubuntu 18 - Old Appstream metainfo")
+    SET(DEB_REQ "dmidecode, sysbench, udisks2, mesa-utils, lm-sensors, xdg-utils, iperf3, fwupd, x11-xserver-utils, gawk") #miss vulkan-tools
+    message("ubuntu 18 - Old Appstream metainfo + noVulkan")
+    set(HARDINFO2_VK 0)
     string(REPLACE "<url type=\"contact\">https://github.com/hardinfo2/hardinfo2/discussions</url>" "" METAINFO_CONTENT "${METAINFO_CONTENT}" )
 endif()
 
 #ubuntu ->20.xx
 if(${disversion} LESS 20.99)
   if(${distro} MATCHES "Ubuntu")
-    message("Ubuntu ->20.xx - LS24")
+    message("Ubuntu ->20.xx - LS24 VK_WAYLAND=0")
+    set(HARDINFO2_VK_WAYLAND 0)
     set(HARDINFO2_LIBSOUP3 0)
   endif()
 endif()
 
 #slackware
 if(${distro} MATCHES "Slackware")
-    message("Slackware - LS24")
+    message("Slackware - LS24 VK_WAYLAND=0")
     set(HARDINFO2_LIBSOUP3 0)
+    set(HARDINFO2_VK_WAYLAND 0)
+    message("FIXME: cannot find libdecor in slackware!")
+endif()
+
+#slint
+if(${distro} MATCHES "Slint")
+    message("Slint VK_WAYLAND=0")
+    set(HARDINFO2_VK_WAYLAND 0)
+    message("FIXME: cannot find libdecor in slint!")
 endif()
 
 #OpenMandriva
 if(${distro} MATCHES "OpenMandriva")
-    SET(RPM_REQ "udisks2, sysbench, fwupd, lm_sensors, xdg-utils, xrandr, vulkan-tools,  glxinfo, iperf")
+    SET(RPM_REQ "dmidecode, udisks2, sysbench, fwupd, lm_sensors, xdg-utils, xrandr, vulkan-tools,  glxinfo, iperf, gawk")
+    set(HARDINFO2_VK_WAYLAND 0)
+    message("FIXME: cannot find libdecor in mandriva!")
 endif()
 
 #PCLinuxOS
 if(${distro} MATCHES "PCLinux")
-    SET(RPM_REQ "udisks2, lm_sensors, xdg-utils, xrandr, vulkan-tools,  glxinfo, iperf") #miss sysbench,fwupd
+    SET(CPACK_RPM_PACKAGE_AUTOREQPROV "no")
+    SET(RPM_REQ "dmidecode, udisks2, lm_sensors, xdg-utils, xrandr, vulkan-tools,  glxinfo, iperf, gawk") #miss sysbench,fwupd
     set(HARDINFO2_SYSTEMV 1)
 endif()
 
 #Devuan
 if(${distro} MATCHES "Devuan")
     set(HARDINFO2_SYSTEMV 1)
+endif()
+
+#ALT Linux
+if(${distro} MATCHES "ALT*" OR ${distro} MATCHES "SimplyLinux")
+    set(HARDINFO2_QT5_MOCQT5 1)
 endif()
 
 #MX
@@ -345,6 +402,15 @@ if(${distro} MATCHES "Alpine")
     set(HARDINFO2_SYSTEMV 1)
 endif()
 
+if(${distro} MATCHES "ClearLinux*")
+  set(HARDINFO2_VK_WAYLAND 0)
+  message("FIXME: libdecor for wayland on clear linux")
+endif()
+
+if(${distro} MATCHES "SystemRescue*")
+  set(HARDINFO2_VK 0)
+endif()
+
 if(${distro} MATCHES "Puppy")
     set(HARDINFO2_SYSTEMV 1)
 endif()
@@ -353,9 +419,17 @@ if(${distro} MATCHES "Artix")
     set(HARDINFO2_SYSTEMV 1)
 endif()
 
-if(HARDINFO2_ARCH MATCHES "riscv")
-    SET(DEB_REQ "udisks2, mesa-utils, lm-sensors, xdg-utils, iperf3, fwupd, x11-xserver-utils, vulkan-tools") #miss sysbench
+#RiscV
+if(${HARDINFO2_ARCH} MATCHES "riscv")
+    SET(DEB_REQ "dmidecode, udisks2, mesa-utils, lm-sensors, xdg-utils, iperf3, fwupd, x11-xserver-utils, vulkan-tools, gawk") #miss sysbench
+    SET(RPM_REQ "dmidecode, udisks2, glx-utils, lm_sensors, xdg-utils, iperf3, fwupd, xrandr, vulkan-tools, gawk") #miss sysbench
 endif()
+
+#E2K - was probably code error in proxy libsoup3 handling
+#if(${HARDINFO2_ARCH} MATCHES "e2k")
+#    message("Arch E2K - Using too old GCC for libsoup3 - LS24")
+#    set(HARDINFO2_LIBSOUP3 0)
+#endif()
 
 #WSL 1/2
 if(EXISTS "/bin/wslinfo")
@@ -379,6 +453,9 @@ add_subdirectory(po)
 
 if(HARDINFO2_QT5)
   add_subdirectory(deps/qgears2)
+endif()
+if(HARDINFO2_VK)
+  add_subdirectory(deps/vkgears)
 endif()
 
 include(FindPkgConfig)
@@ -488,30 +565,15 @@ set(MODULE_network_SOURCES
 	modules/network/samba.c
 )
 if(HARDINFO2_QT5)
-set(MODULE_benchmark_SOURCES
-	modules/benchmark.c
-	modules/benchmark/bench_util.c
-	modules/benchmark/blowfish.c
-	modules/benchmark/blowfish2.c
-	modules/benchmark/cryptohash.c
-	modules/benchmark/fbench.c
-	modules/benchmark/fftbench.c
-	modules/benchmark/fft.c
-	modules/benchmark/fib.c
-	modules/benchmark/md5.c
-	modules/benchmark/nqueens.c
-	modules/benchmark/raytrace.c
-	modules/benchmark/sha1.c
-	modules/benchmark/zlib.c
-	modules/benchmark/sysbench.c
-	modules/benchmark/iperf3.c
-	modules/benchmark/opengl.c
-	modules/benchmark/storage.c
-	modules/benchmark/cachemem.c
-	modules/benchmark/drawing.c
-	modules/benchmark/guibench.c
-)
+  set(HARDINFO2_QT5_FILE "modules/benchmark/opengl.c")
 else()
+  set(HARDINFO2_QT5_FILE "")
+endif()
+if(HARDINFO2_VK)
+  set(HARDINFO2_VK_FILE "modules/benchmark/vulkan.c")
+else()
+  set(HARDINFO2_VK_FILE "")
+endif()
 set(MODULE_benchmark_SOURCES
 	modules/benchmark.c
 	modules/benchmark/bench_util.c
@@ -529,12 +591,13 @@ set(MODULE_benchmark_SOURCES
 	modules/benchmark/zlib.c
 	modules/benchmark/sysbench.c
 	modules/benchmark/iperf3.c
+	${HARDINFO2_QT5_FILE}
+	${HARDINFO2_VK_FILE}
 	modules/benchmark/storage.c
 	modules/benchmark/cachemem.c
 	modules/benchmark/drawing.c
 	modules/benchmark/guibench.c
 )
-endif()
 
 set_source_files_properties(
 	modules/benchmark/blowfish.c
@@ -570,7 +633,6 @@ endif ()
 add_library(sysobj_early STATIC
 	deps/sysobj_early/src/gg_slist.c
 	deps/sysobj_early/src/strstr_word.c
-	deps/sysobj_early/src/auto_free.c
 	deps/sysobj_early/src/util_ids.c
 	deps/sysobj_early/src/util_sysobj.c
 	deps/sysobj_early/src/appf.c
@@ -693,6 +755,15 @@ target_link_libraries(hardinfo2
 )
 endif()
 
+if(${TGZ})
+    SET(PACK_REQ "dmidecode,iperf3,lm_sensors,mesa-utils,sysbench,udisks2,vulkan-tools,xdg-utils,xorg-xrandr,fwupd,qt5-base")
+endif()
+if(${RPM})
+    SET(PACK_REQ ${RPM_REQ})
+endif()
+if(${DEB})
+    SET(PACK_REQ ${DEB_REQ})
+endif()
 configure_file(config.h.cmake ${CMAKE_BINARY_DIR}/config.h @ONLY)
 configure_file(hardinfo2.desktop.cmake ${CMAKE_BINARY_DIR}/hardinfo2.desktop @ONLY)
 
@@ -719,7 +790,7 @@ endif()
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/org.hardinfo2.hardinfo2.metainfo.xml" "${METAINFO_CONTENT}")
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/org.hardinfo2.hardinfo2.metainfo.xml DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/metainfo/)
 execute_process(COMMAND appstream-util validate-relax --nonet ${CMAKE_CURRENT_BINARY_DIR}/org.hardinfo2.hardinfo2.metainfo.xml)
-execute_process(COMMAND appstreamcli validate ${CMAKE_CURRENT_BINARY_DIR}/org.hardinfo2.hardinfo2.metainfo.xml)
+execute_process(COMMAND appstreamcli validate --no-net ${CMAKE_CURRENT_BINARY_DIR}/org.hardinfo2.hardinfo2.metainfo.xml)
 
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/tools/hwinfo2_fetch_sysdata DESTINATION ${CMAKE_INSTALL_BINDIR}
         PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)

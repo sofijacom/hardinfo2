@@ -39,6 +39,7 @@ typedef struct {
     char *cpu_name;
     char *cpu_desc;
     char *cpu_config;
+    char *cpu_hwcaps;
     char *ogl_renderer;
     char *gpu_desc;
     int processors;
@@ -128,8 +129,8 @@ bench_machine *bench_machine_this()
         m->board = module_call_method("devices::getMotherboard");
         m->cpu_name = module_call_method("devices::getProcessorName");
         m->cpu_desc = module_call_method("devices::getProcessorDesc");
-        m->cpu_config =
-            module_call_method("devices::getProcessorFrequencyDesc");
+        m->cpu_config = module_call_method("devices::getProcessorFrequencyDesc");
+	m->cpu_hwcaps = module_call_method("devices::getProcessorHwCaps");
         m->gpu_desc = module_call_method("devices::getGPUList");
         m->ogl_renderer = module_call_method("computer::getOGLRenderer");
         tmp = module_call_method("computer::getMemoryTotal");
@@ -140,9 +141,10 @@ bench_machine *bench_machine_this()
         m->machine_type = module_call_method("computer::getMachineTypeEnglish");
 	m->linux_kernel = module_call_method("computer::getOSKernel");
 	m->linux_os = module_call_method("computer::getOS");
-	m->power_state= module_call_method("devices::getPowerState");
-	m->gpu_name= module_call_method("devices::getGPUname");
-	m->storage= module_call_method("devices::getStorageDevicesModels");
+	m->power_state = module_call_method("devices::getPowerState");
+	m->gpu_name = module_call_method("devices::getGPUname");
+	//m->storage = module_call_method("devices::getStorageDevicesModels");
+	m->storage = module_call_method("devices::getStorageHomeModels");
 	m->vulkanDriver = module_call_method("computer::getVulkanDriver");
 	m->vulkanDevice = module_call_method("computer::getVulkanDevice");
 	m->vulkanVersions = module_call_method("computer::getVulkanVersions");
@@ -321,7 +323,7 @@ bench_result *bench_result_benchmarkjson(const gchar *bench_name,
     JsonObject *machine;
     bench_result *b;
 
-    if (json_node_get_node_type(node) != JSON_NODE_OBJECT)
+    if (!node || (json_node_get_node_type(node) != JSON_NODE_OBJECT))
         return NULL;
 
     machine = json_node_get_object(node);

@@ -137,10 +137,12 @@ void info_add_computed_group(struct Info *info, const gchar *name, const gchar *
     struct InfoGroup donor = {};
     gchar *tmp_str = NULL;
 
-    if (name)
+    if (name && (strlen(name)>0))
         tmp_str = g_strdup_printf("[%s]\n%s", name, value);
-    else
+    else if(value && (strlen(value)>0))
         tmp_str = g_strdup(value);
+
+    if(!tmp_str) return;
 
     tmp_info = info_unflatten(tmp_str);
     if (tmp_info->groups->len != 1) {
@@ -504,8 +506,8 @@ struct Info *info_unflatten(const gchar *str)
 
             for (k = 0; keys[k]; k++) {
                 struct InfoField field = {};
-                gchar *flags, *tag, *name, *label, *dis;
-                key_get_components(keys[k], &flags, &tag, &name, &label, &dis, TRUE);
+                gchar *flags=NULL, *tag=NULL, *name=NULL, *label=NULL, *dis=NULL;
+                key_get_components(keys[k], &flags, &tag, &name, &label, &dis);
                 gchar *value = g_key_file_get_value(key_file, group_name, keys[k], NULL);
 
                 field.tag = tag;
@@ -529,6 +531,7 @@ struct Info *info_unflatten(const gchar *str)
             }
             g_array_append_val(info->groups, group);
         }
+	g_strfreev(keys);
     }
 
     if (spg >= 0) {
@@ -576,6 +579,8 @@ struct Info *info_unflatten(const gchar *str)
         g_free(group_name);
         g_strfreev(keys);
     }
+
+    g_key_file_free(key_file);
 
     return info;
 }

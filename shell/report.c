@@ -248,8 +248,8 @@ void report_details(ReportContext *ctx, gchar *key, gchar *value, gchar *details
 
         gsize longest_key = 0;
         for (j = 0; keys[j]; j++) {
-            gchar *lbl;
-            key_get_components(keys[j], NULL, NULL, NULL, &lbl, NULL, TRUE);
+            gchar *lbl=NULL;
+            key_get_components(keys[j], NULL, NULL, NULL, &lbl, NULL);
             longest_key = MAX(longest_key, strlen(lbl));
             g_free(lbl);
         }
@@ -375,8 +375,8 @@ void report_table(ReportContext * ctx, gchar * text)
 
         gsize longest_key = 0;
         for (j = 0; keys[j]; j++) {
-            gchar *lbl;
-            key_get_components(keys[j], NULL, NULL, NULL, &lbl, NULL, TRUE);
+            gchar *lbl=NULL;
+            key_get_components(keys[j], NULL, NULL, NULL, &lbl, NULL);
             longest_key = MAX(longest_key, strlen(lbl));
             g_free(lbl);
         }
@@ -448,6 +448,7 @@ static void report_html_header(ReportContext * ctx)
 	 "    .stitle { font: bold 2em sans-serif; padding: 10px 0 10px 10px; color: #07575B; font-family: Arial, sans-serif; }\n"
 	 "    .sstitle{ font: bold 1.25em serif; padding: 10px 0 10px 10px; color: #C4DFE6; font-family: Arial, sans-serif; "
 	 "              background: #07575B; border-bottom: 2px solid #009879; border-top: 2px solid #009879;}\n"
+	 "    .hilight  { font: bold 1em sans-serif; color: orange; padding: 2px; font-family: Arial, sans-serif; min-width: auto; width: 300px !important; }\n"
 	 "    .field  { font: 1em sans-serif; color: #C4DFE6; padding: 2px; font-family: Arial, sans-serif; min-width: auto; width: 300px !important; }\n"
 	 "    .value  { font: 1em sans-serif; color: #C4DFE6; font-family: Arial, sans-serif; }\n"
 	 "    table.details { margin-left: 0px;min-width:auto;width:100%%; }\n"
@@ -558,16 +559,19 @@ static void report_html_key_value(ReportContext * ctx, gchar *key, gchar *value,
     gchar *name = (gchar*)key_get_name(key);
 
     if (columns == 2) {
-      ctx->output = h_strdup_cprintf("<tr%s><td class=\"icon\">%s</td><td class=\"field\">%s</td>"
-                                    "<td class=\"value\">%s</td></tr>\n",
-                                    ctx->output,
-                                    highlight ? " class=\"hilight\"" : "",
-                                    icon, name, value);
+      ctx->output = h_strdup_cprintf("<tr><td class=\"icon\">%s</td><td class=\"%s\">%s</td>"
+				     "<td class=\"%s\">%s</td></tr>\n",
+				     ctx->output,
+				     icon,
+				     highlight ? "hilight" : "field",
+				     name,
+				     highlight ? "hilight" : "value",
+				     value);
     } else {
       values = g_strsplit(value, "|", columns);
       mc = g_strv_length(values) - 1;
 
-      ctx->output = h_strdup_cprintf("\n<tr%s>\n<td class=\"icon\">%s</td><td class=\"field\">%s</td>", ctx->output, highlight ? " class=\"hilight\"" : "", icon, name);
+      ctx->output = h_strdup_cprintf("\n<tr>\n<td class=\"icon\">%s</td><td class=\"%s\">%s</td>", ctx->output, icon, highlight ? "hilight" : "field", name);
 
       for (i = columns-2; i >= 0; i--) {
         ctx->output = h_strdup_cprintf("<td class=\"value\">%s</td>",
@@ -782,6 +786,9 @@ static GSList *report_create_module_list_from_dialog(ReportDialog * rd)
 static void
 report_create_inner_from_module_list(ReportContext * ctx, GSList * modules)
 {
+    int t=params.create_report;
+    params.create_report=1;
+
     for (; modules; modules = modules->next) {
 	ShellModule *module = (ShellModule *) modules->data;
 	GSList *entries;
@@ -796,8 +803,7 @@ report_create_inner_from_module_list(ReportContext * ctx, GSList * modules)
             if (entry->flags & MODULE_FLAG_HIDE) continue;
 
 	    if (!params.gui_running && !params.quiet)
-		fprintf(stderr, "\033[2K\033[40;32;1m %s\033[0m\n",
-			entry->name);
+		fprintf(stderr, "\033[2K\033[40;32;1m %s\033[0m\n", entry->name);
 
             if (entry->icon_file){
                 cache_icon(ctx, entry->icon_file);
@@ -805,10 +811,25 @@ report_create_inner_from_module_list(ReportContext * ctx, GSList * modules)
 
 	    ctx->entry = entry;
 	    report_subtitle(ctx, entry->name);
-	    module_entry_scan(entry);
-	    report_table(ctx, module_entry_function(entry));
+	    //Rescan Boots - filter for reports
+            if (strstr(entry->icon_file,"boot")) {
+		entry->scan_func(TRUE);
+	        report_table(ctx, module_entry_function(entry));
+	    //Filter benchmarkresults for reports
+	    } else if (!params.force_all_details && (entry->flags & MODULE_FLAG_BENCHMARK)) {
+	        int i=params.max_bench_results;
+	        params.max_bench_results=25;
+		entry->scan_func(FALSE);
+	        report_table(ctx, module_entry_function(entry));
+		params.max_bench_results=i;
+	    } else {
+	        module_entry_scan(entry);
+	        report_table(ctx, module_entry_function(entry));
+	    }
 	}
     }
+
+    params.create_report=t;
 }
 
 void report_module_list_free(GSList * modules)

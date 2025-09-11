@@ -35,6 +35,8 @@ char *uidefs_str =
     "	</menu>"
     "	<menu name=\"HelpMenu\" action=\"HelpMenuAction\">"
     "		<menuitem name=\"WebPage\" action=\"HomePageAction\" always-show-image=\"true\"/>"
+    "		<menuitem name=\"HelpPage\" action=\"HelpPageAction\" always-show-image=\"true\"/>"
+    "		<menuitem name=\"UpdatesPage\" action=\"UpdatesPageAction\" always-show-image=\"true\"/>"
     "		<menuitem name=\"ReportBug\" action=\"ReportBugAction\" always-show-image=\"true\"/>"
     "		<menuitem name=\"About\" action=\"AboutAction\" always-show-image=\"true\"/>"
     "	</menu>"
@@ -46,6 +48,8 @@ char *uidefs_str =
   /*    "			<toolitem name=\"Copy\" action=\"CopyAction\"/>"*/
     "			<separator/>"
     "                   <toolitem name=\"SyncManager\" action=\"SyncManagerAction\" always-show-image=\"true\"/>"
+    "			<separator/>"
+    "                   <toolitem name=\"Update\" action=\"UpdateAction\" always-show-image=\"true\"/>"
     "	</toolbar>"
     "</ui>";
 
