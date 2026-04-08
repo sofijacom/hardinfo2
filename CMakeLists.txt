@@ -16,21 +16,27 @@ endif()
 project(hardinfo2)
 
 #Release settings
-set(HARDINFO2_VERSION "2.2.14")
-set(HARDINFO2_RELEASE_DATE "2025-05-08")
+set(HARDINFO2_VERSION "2.2.17")
+set(HARDINFO2_RELEASE_DATE "2026-01-15")
 set(HARDINFO2_RELEASE_NOTE_HTML "<p>Development</p><p>\nImprovements\nLots of minor fixes/maintenance/updates/cleanup\nFor details see homepage news.</p>")
 
 #Build settings
 option(HARDINFO2_SERVICE "Build with service support" 1)
 option(HARDINFO2_GTK3 "Build for GTK3 (0/off for GTK2)" 1)
 option(HARDINFO2_LIBSOUP3 "Build for libsoup-3.0 (0/off for libsoup-2.4)" 1)
+#Please use QT5 as long as possible to support compare to other distros
+option(HARDINFO2_QT6 "EXPERIMENTAL - Build opengl benchmark for QT6" 0)
 option(HARDINFO2_QT5 "Build opengl benchmark for QT5" 1)
-option(HARDINFO2_QT5_MOCQT5 "Build QT5 with moc-qt5" 0)
+option(HARDINFO2_QT_MOCQT "Build QTx with moc-qtx" 0)
 option(HARDINFO2_VK "Build vulkan benchmark" 1)
 option(HARDINFO2_VK_WAYLAND "Build Vulkan with wayland support" 1)
 option(HARDINFO2_VK_X11 "Build Vulkan with X11 support" 1)
 option(HARDINFO2_NOSSL "Build for very old distro with no https" 0)
 
+#To allow manually setting QT6 only from cmd line
+if(HARDINFO2_QT6)
+  set(HARDINFO2_QT5 0)
+endif()
 SET(CMAKE_INSTALL_PREFIX "/usr")
 SET(HARDINFO2_SYSTEMV 0)
 SET(HARDINFO2_RUNIT 0)
@@ -92,8 +98,12 @@ message(STATUS "Building HardInfo2 for architecture: ${HARDINFO2_OS}-${HARDINFO2
 
 #add_definitions("-std=gnu89")
 #add_definitions("-fanalyzer")
+add_definitions("-Wall")
 add_definitions("-Wextra")
 add_definitions("-Wno-missing-field-initializers")
+add_definitions("-Wno-ignored-attributes")
+add_definitions("-Wno-unused-parameter")
+add_definitions("-Wno-missing-braces")
 add_definitions("-Wformat")
 add_definitions("-Wformat-security")
 
@@ -114,6 +124,7 @@ else()
 endif()
 set(RPM 0)
 set(TGZ 0)
+set(APK 0)
 string(REGEX REPLACE "NAME=" "" distro "${distro}")
 string(REGEX REPLACE "\"" "" distro "${distro}")
 string(REGEX REPLACE "/" "" distro "${distro}")
@@ -132,14 +143,22 @@ string(REGEX REPLACE " " "" disversion "${disversion}")
 if(${distro} MATCHES "Alma*" OR ${distro} MATCHES "Rocky*" OR ${distro} MATCHES "Fedora*" OR ${distro} MATCHES "RedHat*" OR ${distro} MATCHES "CentOS*" OR ${distro} MATCHES "Oracle*" OR ${distro} MATCHES "openSUSE*" OR ${distro} MATCHES "SUSE*" OR ${distro} MATCHES "PCLinuxOS*" OR ${distro} MATCHES "Ultramarine*" OR ${distro} MATCHES "Nobara*" OR ${distro} MATCHES "OpenMandriva*")
   #ALT Linux is RPM but too old rpmbuild - use alien until fixed
   # OR ${distro} MATCHES "ALT*" OR ${distro} MATCHES "SimplyLinux"
-  set(RPM 1)
+  #Support for debian edition (eg. pclinuxos)
+  if(${distro} MATCHES "Debian*")
+    set(RPM 0)
+  else()
+    set(RPM 1)
+  endif()
 endif()
 #Arch Distro's (tgz)
-if(${distro} MATCHES "Arch*" OR ${distro} MATCHES "Endeavour*" OR ${distro} MATCHES "Garuda*" OR ${distro} MATCHES "Reborn*" OR ${distro} MATCHES "SystemRescue*" OR ${distro} MATCHES "Artix*" OR ${distro} MATCHES "Manjaro*")
+if(${distro} MATCHES "Arch*" OR ${distro} MATCHES "Endeavour*" OR ${distro} MATCHES "Garuda*" OR ${distro} MATCHES "Reborn*" OR ${distro} MATCHES "SystemRescue*" OR ${distro} MATCHES "Artix*" OR ${distro} MATCHES "Manjaro*" OR ${distro} MATCHES "CachyOS*")
   set(TGZ 1)
 endif()
+if(${distro} MATCHES "postmarket*" OR ${distro} MATCHES "alpine*")
+  set(APK 1)
+endif()
 #Package architecture
-if(${RPM})
+if(${RPM} OR ${APK})
   set(PACKAGE_DELIMITER "-")
   set(PACKAGE_ARCHITECTURE ".${CMAKE_SYSTEM_PROCESSOR}")
 else()
@@ -215,6 +234,7 @@ if(${disversion} LESS 6.99)
     set(HARDINFO2_SYSTEMV 1)
     message("RPM EL6 - no QT5+VK - Disabling benchmarks")
     set(HARDINFO2_QT5 0)
+    set(HARDINFO2_QT6 0)
     set(HARDINFO2_VK 0)
     message("RPM EL6 - NOSSL too old for https")
     set(HARDINFO2_NOSSL 1)
@@ -239,6 +259,7 @@ endif()
 #Fedora 23
 if(${distro}${disversion} MATCHES "Fedora23")
     message("FC23 - no QT5+VK - Disabling benchmarks")
+    set(HARDINFO2_QT6 0)
     set(HARDINFO2_QT5 0)
     set(HARDINFO2_VK 0)
     message("Fedora 23 - Too Old for HTTPS")
@@ -259,6 +280,7 @@ if(${distro}${disversion} MATCHES "DebianGNULinux7")
     set(PACKAGE_LIBSOUP2_MINVERSION 2.34.3)
     message("DEB 7 - no QT5+VK - Disabling benchmarks")
     set(HARDINFO2_QT5 0)
+    set(HARDINFO2_QT6 0)
     set(HARDINFO2_VK 0)
     message("DEB 7 - NOSSL too old for https")
     set(HARDINFO2_NOSSL 1)
@@ -270,6 +292,7 @@ endif()
 if(${distro}${disversion} MATCHES "DebianGNULinux8")
     message("DEB 8 - GTK3 version 3.14.5 is low - Themes disabled")
     message("DEB 8 - no QT5 - Disabling opengl benchmarks")
+    set(HARDINFO2_QT6 0)
     set(HARDINFO2_QT5 0)
     set(HARDINFO2_VK 0)
     SET(DEB_REQ "dmidecode, sysbench, udisks2, mesa-utils, lm-sensors, xdg-utils, iperf3, x11-xserver-utils, libsigsegv2, gawk") #miss vulkan-tools,fwupd +libsigsegv2 for gawk
@@ -280,6 +303,7 @@ if(${distro}${disversion} MATCHES "DebianGNULinux99")
 else()
     if(${distro}${disversion} MATCHES "DebianGNULinux9")
         message("DEB 9 - QT5 too low - Disabling opengl benchmarks")
+        set(HARDINFO2_QT6 0)
         set(HARDINFO2_QT5 0)
         set(HARDINFO2_VK 0)
 	SET(DEB_REQ "dmidecode, sysbench, udisks2, mesa-utils, lm-sensors, xdg-utils, iperf3, fwupd, x11-xserver-utils, gawk") #miss vulkan-tools
@@ -313,10 +337,25 @@ if(${disversion} LESS 10.99)
   endif()
 endif()
 
+#ubuntu 14
+if(${distro}${disversion} MATCHES "Ubuntu14")
+    message("Ubuntu 14 - no QT5 - Disabling opengl+vulkan benchmarks")
+    set(HARDINFO2_VK 0)
+    set(HARDINFO2_QT6 0)
+    set(HARDINFO2_QT5 0)
+    message("Ubuntu 14 - GTK2 - deprecated - support will end at any time")
+    set(HARDINFO2_GTK3 0)
+    SET(DEB_REQ "dmidecode, sysbench, udisks2, mesa-utils, lm-sensors, xdg-utils, iperf3, x11-xserver-utils, gawk") #miss vulkan-tools
+    message("ubuntu 14 - Old Appstream metainfo")
+    string(REPLACE "<url type=\"contact\">https://github.com/hardinfo2/hardinfo2/discussions</url>" "" METAINFO_CONTENT "${METAINFO_CONTENT}" )
+    string(REPLACE "<url type=\"translate\">https://github.com/hardinfo2/hardinfo2/tree/master/po</url>" "" METAINFO_CONTENT "${METAINFO_CONTENT}" )
+endif()
+
 #ubuntu 16
 if(${distro}${disversion} MATCHES "Ubuntu16")
     message("Ubuntu 16 - no QT5 - Disabling opengl+vulkan benchmarks")
     set(HARDINFO2_VK 0)
+    set(HARDINFO2_QT6 0)
     set(HARDINFO2_QT5 0)
     SET(DEB_REQ "dmidecode, sysbench, udisks2, mesa-utils, lm-sensors, xdg-utils, iperf3, fwupd, x11-xserver-utils, gawk") #miss vulkan-tools
     message("ubuntu 16 - Old Appstream metainfo")
@@ -359,8 +398,9 @@ endif()
 #OpenMandriva
 if(${distro} MATCHES "OpenMandriva")
     SET(RPM_REQ "dmidecode, udisks2, sysbench, fwupd, lm_sensors, xdg-utils, xrandr, vulkan-tools,  glxinfo, iperf, gawk")
-    set(HARDINFO2_VK_WAYLAND 0)
-    message("FIXME: cannot find libdecor in mandriva!")
+    #set(HARDINFO2_VK_WAYLAND 0)
+    #message("FIXME: cannot find libdecor in mandriva!")
+    #is called libdecor-gtk
 endif()
 
 #PCLinuxOS
@@ -377,7 +417,7 @@ endif()
 
 #ALT Linux
 if(${distro} MATCHES "ALT*" OR ${distro} MATCHES "SimplyLinux")
-    set(HARDINFO2_QT5_MOCQT5 1)
+    set(HARDINFO2_QT_MOCQT 1)
 endif()
 
 #MX
@@ -443,7 +483,7 @@ endif()
 
 if(${CMAKE_BUILD_TYPE} MATCHES [Dd]ebug)
 	set(HARDINFO2_DEBUG 1)
-        if(${distro}${disversion} MATCHES "DebianGNULinux7")
+        if(${distro}${disversion} MATCHES "DebianGNULinux7" OR ${distro} MATCHES "alpine*" OR ${distro} MATCHES "postmarket*")
         else()
 	   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
         endif()
@@ -451,7 +491,7 @@ endif()
 
 add_subdirectory(po)
 
-if(HARDINFO2_QT5)
+if(HARDINFO2_QT5 OR HARDINFO2_QT6)
   add_subdirectory(deps/qgears2)
 endif()
 if(HARDINFO2_VK)
@@ -564,10 +604,10 @@ set(MODULE_network_SOURCES
 	modules/network/nfs.c
 	modules/network/samba.c
 )
-if(HARDINFO2_QT5)
-  set(HARDINFO2_QT5_FILE "modules/benchmark/opengl.c")
+if(HARDINFO2_QT5 OR HARDINFO2_QT6)
+  set(HARDINFO2_QT_FILE "modules/benchmark/opengl.c")
 else()
-  set(HARDINFO2_QT5_FILE "")
+  set(HARDINFO2_QT_FILE "")
 endif()
 if(HARDINFO2_VK)
   set(HARDINFO2_VK_FILE "modules/benchmark/vulkan.c")
@@ -591,7 +631,7 @@ set(MODULE_benchmark_SOURCES
 	modules/benchmark/zlib.c
 	modules/benchmark/sysbench.c
 	modules/benchmark/iperf3.c
-	${HARDINFO2_QT5_FILE}
+	${HARDINFO2_QT_FILE}
 	${HARDINFO2_VK_FILE}
 	modules/benchmark/storage.c
 	modules/benchmark/cachemem.c
@@ -605,7 +645,7 @@ set_source_files_properties(
 	modules/benchmark/md5.c
 	modules/benchmark/sha1.c
 	PROPERTIES
-	COMPILE_FLAGS "-O0 -Wall -Wextra -Werror=implicit-function-declaration"
+	COMPILE_FLAGS "-O0 -Werror=implicit-function-declaration"
 )
 
 set_source_files_properties(
@@ -614,13 +654,13 @@ set_source_files_properties(
 	hardinfo2/problem_marker.c
 	hardinfo2/hinote_util.c
 	PROPERTIES
-	COMPILE_FLAGS "-std=c99 -Wall -Wextra -Wno-switch -Werror=implicit-function-declaration"
+	COMPILE_FLAGS "-std=c99 -Wno-switch -Werror=implicit-function-declaration"
 )
 
 foreach (_module ${HARDINFO2_MODULES})
 	add_library(${_module} MODULE ${MODULE_${_module}_SOURCES})
 	set_target_properties(${_module} PROPERTIES PREFIX "")
-	set_target_properties(${_module} PROPERTIES COMPILE_FLAGS "-Wall -Wextra -Wno-unused-parameter -Wno-missing-braces -Wno-switch -Werror=implicit-function-declaration")
+	set_target_properties(${_module} PROPERTIES COMPILE_FLAGS "-Wno-switch -Werror=implicit-function-declaration")
 	target_link_libraries(${_module} ${JSON_GLIB_LIBRARIES})
 endforeach()
 
@@ -642,7 +682,7 @@ add_library(sysobj_early STATIC
 	deps/sysobj_early/src/format_early.c
 	deps/sysobj_early/src/cpubits.c
 )
-set_target_properties(sysobj_early PROPERTIES COMPILE_FLAGS "-std=c99 -Wall -Wextra -Wno-parentheses -Werror=implicit-function-declaration")
+set_target_properties(sysobj_early PROPERTIES COMPILE_FLAGS "-std=c99 -Wno-parentheses -Werror=implicit-function-declaration")
 target_link_libraries(sysobj_early m)
 
 if (HARDINFO2_GTK3)
@@ -659,7 +699,7 @@ add_library(uber-graph STATIC
 	deps/uber-graph/uber-timeout-interval.c
 	deps/uber-graph/uber-window.c
 )
-set_target_properties(uber-graph PROPERTIES COMPILE_FLAGS "-Wall -Wextra -Wno-deprecated-declarations -Wno-unused-parameter -Werror=implicit-function-declaration")
+set_target_properties(uber-graph PROPERTIES COMPILE_FLAGS "-Wno-deprecated-declarations -Werror=implicit-function-declaration")
 endif()
 
 set_source_files_properties(
@@ -670,7 +710,7 @@ set_source_files_properties(
 	hardinfo2/x_util.c
 	hardinfo2/dt_util.c
 	PROPERTIES
-	COMPILE_FLAGS "-Wall -Wextra -Wno-parentheses -Werror=implicit-function-declaration"
+	COMPILE_FLAGS "-Wno-parentheses -Werror=implicit-function-declaration"
 )
 
 if (HARDINFO2_GTK3)
@@ -825,7 +865,13 @@ install(FILES pixmaps/hardinfo2.svg
 
 ########################CPack PACKAGE BUILDING###########################
 SET(CPACK_PACKAGE_HOMEPAGE_URL "https://www.hardinfo2.org")
-if(${TGZ})
+if(${APK})
+    SET(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
+    SET(CPACK_SOURCE_IGNORE_FILES "/build/;/.git/;/.github/;.gitignore;.gitmodules;*.po.old;*~;*.mo;")
+    SET(CPACK_SOURCE_GENERATOR "TGZ")
+    SET(CPACK_GENERATOR "External")
+    SET(CPACK_EXTERNAL_PACKAGE_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/tools/alpinecpack")
+elseif(${TGZ})
     SET(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
     SET(CPACK_SOURCE_IGNORE_FILES "/build/;/.git/;/.github/;.gitignore;.gitmodules;*.po.old;*~;*.mo;")
     SET(CPACK_SOURCE_GENERATOR "TGZ")

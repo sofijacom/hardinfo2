@@ -48,6 +48,22 @@
 
 void sync_manager_clear_entries(void);
 
+int get_systype(void)
+{
+    FILE *io;
+    int systype=-1;
+    gchar buffer[100];
+    if( (io = fopen("/run/hardinfo2/systype", "r")) ) {
+        if(fgets(buffer, sizeof(buffer), io)) {
+	    if(strstr(buffer,"Root")) systype=0;
+	    if(strstr(buffer,"Single")) systype=1;
+	    if(strstr(buffer,"Multi")) systype=2;
+        }
+	fclose(io);
+    }
+    return systype;
+}
+
 gchar *find_program(gchar *program_name)
 {
     int i;
@@ -148,16 +164,11 @@ gchar *size_human_readable(gfloat size)
     return g_strdup_printf(_("%.1f PiB"), size / PiB);
 }
 
-char *strend(gchar * str, gchar chr)
+//ends a line by replaceing chr to 0, OK for str=NULL
+void strend(gchar * str, gchar chr)
 {
-    if (!str)
-	return NULL;
-
     char *p;
-    if( (p = g_utf8_strchr(str, -1, chr)) )
-	*p = 0;
-
-    return str;
+    if( str && (p = g_utf8_strchr(str, -1, chr)) ) *p = 0;
 }
 
 void remove_quotes(gchar * str)
@@ -283,6 +294,7 @@ gchar *file_chooser_build_filename(GtkWidget * chooser, gchar * extension)
     return retval;
 }
 
+#ifdef HARDINFO2_DEBUG
 static void
 log_handler(const gchar * log_domain,
 	    GLogLevelFlags log_level,
@@ -313,6 +325,7 @@ log_handler(const gchar * log_domain,
 	gtk_widget_destroy(dialog);
     }
 }
+#endif
 
 void parameters_init(int *argc, char ***argv, ProgramParameters * param)
 {
@@ -486,13 +499,20 @@ gint ui_init(int *argc, char ***argv)
     DEBUG("initializing gtk+ UI");
 
     g_set_application_name("HardInfo2");
+#ifdef HARDINFO2_DEBUG
     g_log_set_handler(NULL,
 		      G_LOG_LEVEL_WARNING | G_LOG_FLAG_FATAL |
 		      G_LOG_LEVEL_ERROR, log_handler, NULL);
-
+#endif
     return gtk_init_check(argc, argv);
 }
 
+gchar *strreplace_chr(gchar * string, gchar replace, gchar new_char)
+{
+    gchar *s;
+    for (s = string; *s; s++) if (*s==replace) *s = new_char;
+    return string;
+}
 /* Copyright: Jens Låås, SLU 2002 */
 gchar *strreplacechr(gchar * string, gchar * replace, gchar new_char)
 {
@@ -515,6 +535,37 @@ gchar *strreplace(gchar *string, gchar *replace, gchar *replacement)
 
     return ret;
 }
+
+//read a string, line by line calling change function and allow search, xtraction, manipulation, etc.
+//Cleansup string if change ever return a new string
+//EXAMPLE: gchar *change(gchar *line){printf("Line:%s (%lu)\n",line,strlen(line)); return g_strdup(line);} //return new string for line, return g_strdup("") removes line
+//EXAMPLE: gchar *change(gchar *line){printf("Line:%s (%lu)\n",line,strlen(line)); return NULL;} //return always NULL means leave original string unchanged
+//EXANOKE; st=fixline(st,*change);
+gchar* fixline(gchar *st, gchar* handle_line(gchar*)) {
+    gchar *np=NULL, *p=st, *s=NULL, *newst=NULL, *t;
+    while(p){
+        np=strchr(p,'\n');
+	if(np) *np=0;
+	s=handle_line(p);
+	if(s) {
+	    if(newst){
+	        t=newst;
+		if(strlen(s)) {newst=g_strconcat(t,s,"\n",NULL);g_free(t);}
+		g_free(s);s=st;
+	    } else {
+	      if(strlen(s)) newst=s; else {g_free(s);s=st;}
+	    }
+	} else if(np) *np='\n';
+	if(np) p=np+1; else p=NULL;
+    }
+    if(s){
+        g_free(st);
+	return newst;
+    } else {
+        return st;
+    }
+}
+
 
 static GHashTable *__module_methods = NULL;
 
@@ -589,40 +640,38 @@ static gboolean remove_module_methods(gpointer key, gpointer value, gpointer dat
 static void module_unload(ShellModule * module)
 {
     GSList *entry;
-
     if (module->dll) {
         gchar *name;
 
         if (module->deinit) {
-        	DEBUG("cleaning up module \"%s\"", module->name);
+		DEBUG("cleaning up module \"%s\"", module->name);
 		module->deinit();
 	} else {
 		DEBUG("module \"%s\" does not need cleanup", module->name);
 	}
 
         name = g_path_get_basename(g_module_name(module->dll));
-        g_hash_table_foreach_remove(__module_methods, remove_module_methods, name);
+        if(__module_methods) g_hash_table_foreach_remove(__module_methods, remove_module_methods, name);
 
     	g_module_close(module->dll);
     	g_free(name);
     }
 
-    g_free(module->name);
-    g_object_unref(module->icon);
-
-    for (entry = module->entries; entry; entry = entry->next) {
-	ShellModuleEntry *e = (ShellModuleEntry *)entry->data;
-
-	g_source_remove_by_user_data(e);
-    	g_free(e);
+    //if(module->name) g_free(module->name);
+    if(module->icon) g_object_unref(module->icon);
+    if(module->entries){
+        for (entry = module->entries; entry; entry = entry->next) {
+	    ShellModuleEntry *e = (ShellModuleEntry *)entry->data;
+	    g_source_remove_by_user_data(e);
+	    g_free(e);
+	}
+	g_slist_free(module->entries);
     }
-
-    g_slist_free(module->entries);
     g_free(module);
 }
 
 
-void module_unload_all(void)
+void module_unload_all(GSList *modules)
 {
     Shell *shell;
     GSList *module, *merge_id;
@@ -630,25 +679,26 @@ void module_unload_all(void)
     shell = shell_get_main_shell();
 
     sync_manager_clear_entries();
-    shell_clear_timeouts(shell);
-    shell_clear_tree_models(shell);
-    shell_clear_field_updates();
-    shell_set_title(shell, NULL);
-
-    for (module = shell->tree->modules; module; module = module->next) {
-    	module_unload((ShellModule *)module->data);
+    if(shell) shell_clear_timeouts(shell);
+    if(shell && params.gui_running) {
+        shell_clear_tree_models(shell);
+	shell_clear_field_updates();
+	//shell_set_title(shell, NULL);
     }
-
-    for (merge_id = shell->merge_ids; merge_id; merge_id = merge_id->next) {
-    	gtk_ui_manager_remove_ui(shell->ui_manager,
-			         GPOINTER_TO_INT(merge_id->data));
+    for (module = modules; module; module = module->next) {
+        module_unload((ShellModule *)module->data);
     }
-    g_slist_free(shell->tree->modules);
-    g_slist_free(shell->merge_ids);
+    g_slist_free(modules);
 
-    shell->merge_ids = NULL;
-    shell->tree->modules = NULL;
-    shell->selected = NULL;
+    if(params.gui_running && shell && shell->merge_ids){
+        for (merge_id = shell->merge_ids; merge_id; merge_id = merge_id->next) {
+          gtk_ui_manager_remove_ui(shell->ui_manager, GPOINTER_TO_INT(merge_id->data));
+        }
+        g_slist_free(shell->merge_ids);
+	shell->merge_ids = NULL;
+	shell->tree->modules = NULL;
+	shell->selected = NULL;
+    }
 }
 
 static ShellModule *module_load(gchar * filename)
@@ -742,7 +792,7 @@ static ShellModule *module_load(gchar * filename)
 	//DEBUG("registering methods for module ``%s''", filename);
 	module_register_methods(module);
     } else {
-    	DEBUG("cannot g_module_open(``%s''). permission problem?", filename);
+	DEBUG("cannot g_module_open(``%s''). permission problem?", filename);
       failed:
 	DEBUG("loading module %s failed: %s", filename, g_module_error());
 
@@ -975,7 +1025,7 @@ gchar *module_entry_get_moreinfo(ShellModuleEntry * module_entry, gchar * field)
 const gchar *module_entry_get_note(ShellModuleEntry * module_entry)
 {
     if (module_entry->notefunc) {
-	return module_entry->notefunc(module_entry->number);
+        return module_entry->notefunc(module_entry->number);
     }
 
     return NULL;
@@ -1313,7 +1363,7 @@ gboolean hardinfo_spawn_command_line_sync(const gchar *command_line,
                                           gint *exit_status,
                                           GError **error)
 {
-    shell_status_pulse();
+    //shell_status_pulse();
     return g_spawn_command_line_sync(command_line, standard_output,
                                      standard_error, exit_status, error);
 }

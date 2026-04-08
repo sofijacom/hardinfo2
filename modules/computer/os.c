@@ -34,73 +34,74 @@ typedef struct {
 } AptFlavor;
 
 static const AptFlavor apt_flavors[] = {
-    { "Puppy Linux",    "puppy",           "/etc/DISTRO_SPECS",            "/etc/DISTRO_SPECS",          "DISTRO_VERSION="      },
-    { "Winux",          "winux",           "/usr/bin/winux-driver-manager","/etc/os-release",            "PRETTY_NAME=\"Winux " },
-    { "Vendefoul Wolf", "Vendefoul",       "/opt/vendefoulwolf.png",       "/etc/os-release",            "VERSION_ID="          },
-    { "Parrot Security","parrot",          "parrot-updater",               "/etc/os-release",            "VERSION_ID="          },
-    { "Bodhi Linux",    "bodhi",           "bodhi-appcenter",              "/etc/bodhi/info",            "RELEASE="             },
-    { "MX Linux",       "mxlinux",         "mx-welcome",                   "/etc/mx-version",            "MX-"                  },
-    { "Raspbian",       "raspbian",        "raspbian-archive-keyring",     "/etc/os-release",            "VERSION_ID="          },
-    { "Armbian",        "armbian",         "armbian-config",               "/etc/armbian-image-release", "VERSION="             },
-    { "Raspberry Pi",   "raspberry-pi",    "rpi-update",                   "/etc/os-release",            "VERSION_ID="          },
-    { "RevyOS",         "revyos",          "revyos-keyring",               "/etc/revyos-release",        "BUILD_ID="            },
-    { "PureOS",         "pureos",          "pureos-settings",              "/etc/os-release",            "VERSION_ID="          },
-    { "Xubuntu",        "xubuntu",         "xubuntu-desktop",              "/etc/os-release",            "VERSION_ID="          },
-    { "Kubuntu",        "kubuntu",         "kubuntu-desktop",              "/etc/os-release",            "VERSION_ID="          },
-    { "Lubuntu",        "lubuntu",         "lubuntu-desktop",              "/etc/os-release",            "VERSION_ID="          },
-    { "Edubuntu",       "edubuntu",        "edubuntu-desktop",             "/etc/os-release",            "VERSION_ID="          },
-    { "Ubuntu Server",  "ubuntu",          "ubuntu-server",                "/etc/os-release",            "VERSION_ID="          },
-    { "Ubuntu MATE",    "ubuntu-mate",     "ubuntu-mate-desktop",          "/etc/os-release",            "VERSION_ID="          },
-    { "Ubuntu Budgie",  "ubuntu-budgie",   "ubuntu-budgie-desktop",        "/etc/os-release",            "VERSION_ID="          },
-    { "Ubuntu Kylin",   "ubuntu-kylin",    "ubuntukylin-desktop",          "/etc/os-release",            "VERSION_ID="          },
-    { "Ubuntu Studio",  "ubuntu-studio",   "ubuntustudio-desktop",         "/etc/os-release",            "VERSION_ID="          },
-    { "Ubuntu Desktop", "ubuntu",          "ubuntu-desktop",               "/etc/os-release",            "VERSION_ID="          },
-    { "Ubuntu GNOME",   "ubuntu-gnome",    "ubuntu-gnome-desktop",         "/etc/os-release",            "VERSION_ID="          },//dead
+    { "PCLinuxOS Debian", "pclinuxos",       "/etc/pclinuxos_version",       "/etc/os-release",            "VERSION_ID="          },
+    { "PCLinuxOS",        "pclinuxos",       "/etc/pclinuxos_version",       "/etc/os-release",            "VERSION_ID="          },
+    { "Puppy Linux",      "puppy",           "/etc/DISTRO_SPECS",            "/etc/DISTRO_SPECS",          "DISTRO_VERSION="      },
+    { "Winux",            "winux",           "/usr/bin/winux-driver-manager","/etc/os-release",            "PRETTY_NAME=\"Winux " },
+    { "Vendefoul Wolf",   "Vendefoul",       "/opt/vendefoulwolf.png",       "/etc/os-release",            "VERSION_ID="          },
+    { "Parrot Security",  "parrot",          "parrot-updater",               "/etc/os-release",            "VERSION_ID="          },
+    { "Bodhi Linux",      "bodhi",           "bodhi-appcenter",              "/etc/bodhi/info",            "RELEASE="             },
+    { "MX Linux",         "mxlinux",         "mx-welcome",                   "/etc/mx-version",            "MX-"                  },
+    { "Raspbian",         "raspbian",        "raspbian-archive-keyring",     "/etc/os-release",            "VERSION_ID="          },
+    { "Armbian",          "armbian",         "armbian-config",               "/etc/armbian-image-release", "VERSION="             },
+    { "Raspberry Pi",     "raspberry-pi",    "rpi-update",                   "/etc/os-release",            "VERSION_ID="          },
+    { "RevyOS",           "revyos",          "revyos-keyring",               "/etc/revyos-release",        "BUILD_ID="            },
+    { "PureOS",           "pureos",          "pureos-settings",              "/etc/os-release",            "VERSION_ID="          },
+    { "Xubuntu",          "xubuntu",         "xubuntu-desktop",              "/etc/os-release",            "VERSION_ID="          },
+    { "Kubuntu",          "kubuntu",         "kubuntu-desktop",              "/etc/os-release",            "VERSION_ID="          },
+    { "Lubuntu",          "lubuntu",         "lubuntu-desktop",              "/etc/os-release",            "VERSION_ID="          },
+    { "Edubuntu",         "edubuntu",        "edubuntu-desktop",             "/etc/os-release",            "VERSION_ID="          },
+    { "Ubuntu Server",    "ubuntu",          "ubuntu-server",                "/etc/os-release",            "VERSION_ID="          },
+    { "Ubuntu MATE",      "ubuntu-mate",     "ubuntu-mate-desktop",          "/etc/os-release",            "VERSION_ID="          },
+    { "Ubuntu Budgie",    "ubuntu-budgie",   "ubuntu-budgie-desktop",        "/etc/os-release",            "VERSION_ID="          },
+    { "Ubuntu Kylin",     "ubuntu-kylin",    "ubuntukylin-desktop",          "/etc/os-release",            "VERSION_ID="          },
+    { "Ubuntu Studio",    "ubuntu-studio",   "ubuntustudio-desktop",         "/etc/os-release",            "VERSION_ID="          },
+    { "Ubuntu Desktop",   "ubuntu",          "ubuntu-desktop",               "/etc/os-release",            "VERSION_ID="          },
+    { "Ubuntu GNOME",     "ubuntu-gnome",    "ubuntu-gnome-desktop",         "/etc/os-release",            "VERSION_ID="          },//dead
     { NULL }
 };
 void apt_flavors_scan(gchar **pretty_name, gchar **codename, gchar **id, gchar **orig_id, gchar **orig_name) {
     gboolean spawned;
-    gchar *out, *err, *p, *next_nl,*st,*version;
+    gchar *out=NULL, *err=NULL, *p, *pack, *st, *version;
     gchar **split, *contents=NULL, **line;
     gint exit_status;
     const AptFlavor *f = NULL;
     gchar *cmdline;
     int i = 0, found=0;
-
-    while(!found && apt_flavors[i].name){
-       if((apt_flavors[i].aptname[0]=='/') && g_file_get_contents(apt_flavors[i].aptname, &contents, NULL, NULL)) {
-	   found=1;
-           f = &apt_flavors[i];
-	   g_free(contents);
-       } else if(apt_flavors[i].aptname[0]!='/') {
-	   cmdline = g_strconcat("sh -c 'LC_ALL=C apt-cache policy ", apt_flavors[i].aptname,"'",NULL);
-           spawned = hardinfo_spawn_command_line_sync(cmdline, &out, &err, &exit_status, NULL);
-	   g_free(cmdline);
-           if (spawned) {
-                p = out;
-                while((next_nl = strchr(p, '\n'))) {
-                    strend(p, '\n');
-                    int mc = 0;
-		    char pkg[32] = "";
-		    if (*p != ' ' && *p != '\t')
-		       mc = sscanf(p, "%31s", pkg);
-		    if (mc == 1) {
-		       strend(pkg, ':');
-		       int i=0;
-		       while(apt_flavors[i].name && !SEQ(apt_flavors[i].aptname, pkg)) i++;
-		       if(apt_flavors[i].name) f = &apt_flavors[i]; else f=NULL;
-		    } else if(g_strstr_len(p, -1, "Installed:") && !g_strstr_len(p, -1, "(none)") ) {
-		        found=1;
-		        break;
-		    }
-                    p = next_nl + 1;
-	        }
-	        g_free(out);
-	        g_free(err);
-	    }
-        }
-        if(!found) i++;
+    gchar *packs=g_strdup("");
+    //ask once for all variants
+    while(apt_flavors[i].name) {
+        if(apt_flavors[i].aptname[0]!='/') {
+	    p=packs;
+	    packs = g_strconcat(packs, " ", apt_flavors[i].aptname, NULL);
+	    if(p) g_free(p);
+	}
+	i++;
     }
+    cmdline = g_strconcat("sh -c 'LC_ALL=C dpkg -l ", packs, "'", NULL);
+    g_free(packs);
+    spawned = hardinfo_spawn_command_line_sync(cmdline, &out, &err, &exit_status, NULL);
+    g_free(cmdline);
+
+    i=0;
+    while(!found && apt_flavors[i].name){
+        if((apt_flavors[i].aptname[0]=='/') && g_file_get_contents(apt_flavors[i].aptname, &contents, NULL, NULL)) {
+	    found=1;
+            f = &apt_flavors[i];
+	    g_free(contents);
+	} else if((apt_flavors[i].aptname[0]!='/') && spawned && out) {
+	    p = out;
+	    pack = g_strconcat("ii  ", apt_flavors[i].aptname, NULL);
+	    if(strstr(p,pack)) {
+	        f = &apt_flavors[i];
+		found=1;
+	    }
+	    g_free(pack);
+	}
+	if(!found) i++;
+    }
+    if(out) g_free(out);
+    if(err) g_free(err);
 
     if(found){
         //find version
@@ -172,10 +173,12 @@ static gchar *get_libc_version(void)
         if (spawned) {
 
 	    if (libs[i].use_stderr) {
-                if (strstr(err,"musl")) {p=strchr(err,'\n');*p=' ';} //combine musl arch and version
-		p = strend(err, '\n');
+	        if (strstr(err,"musl")) {p=strchr(err,'\n');if(p) *p=' ';} //combine musl arch and version by removing first newline
+		strend(err, '\n');
+		p=err;
 	    } else {
-	        p = strend(out, '\n');
+	        strend(out, '\n');
+		p=out;
 	    }
 
 	    if (p && strstr(p, libs[i].match_str)) {
@@ -235,8 +238,8 @@ static gchar *detect_gnome_version(void)
         tmp = strstr(out, _("GNOME Shell "));
 
         if (tmp) {
-            tmp += strlen(_("GNOME Shell "));
-            ret=g_strdup_printf("GNOME %s", strend(tmp, '\n'));
+	    strend(tmp, '\n');
+            ret=g_strdup_printf("GNOME %s", tmp+strlen(_("GNOME Shell ")));
 	    g_free(out);
 	    return ret;
         }
@@ -248,8 +251,8 @@ static gchar *detect_gnome_version(void)
         tmp = strstr(out, _("Version: "));
 
         if (tmp) {
-            tmp += strlen(_("Version: "));
-            ret=g_strdup_printf("GNOME %s", strend(tmp, '\n'));
+	    strend(tmp, '\n');
+            ret=g_strdup_printf("GNOME %s", tmp+strlen(_("Version: ")));
             g_free(out);
 	    return ret;
         }
@@ -271,8 +274,8 @@ static gchar *detect_mate_version(void)
         tmp = strstr(out, _("MATE Desktop Environment "));
 
         if (tmp) {
-            tmp += strlen(_("MATE Desktop Environment "));
-	    ret=g_strdup_printf("MATE %s", strend(tmp, '\n'));
+	    strend(tmp, '\n');
+	    ret=g_strdup_printf("MATE %s", tmp+strlen(_("MATE Desktop Environment ")));
 	    g_free(out);
             return ret;
         }

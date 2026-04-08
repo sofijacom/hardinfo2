@@ -66,7 +66,9 @@ static void info_selected_show_extra(const gchar *tag);
 static gboolean reload_section(gpointer data);
 static gboolean rescan_section(gpointer data);
 static gboolean update_field(gpointer data);
+#if GTK_CHECK_VERSION(3,0,0)
 static GSettings *settings=NULL;
+#endif
 /*
  * Globals ********************************************************************
  */
@@ -105,9 +107,11 @@ void shell_ui_manager_set_visible(const gchar * path, gboolean setting)
 
 void shell_clear_tree_models(Shell *shell)
 {
-    gtk_tree_store_clear(GTK_TREE_STORE(shell->tree->model));
-    gtk_tree_store_clear(GTK_TREE_STORE(shell->info_tree->model));
-    gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(shell->info_tree->view), FALSE);
+    if(shell){
+        if(shell->tree && shell->tree->model) gtk_tree_store_clear(GTK_TREE_STORE(shell->tree->model));
+        if(shell->info_tree && shell->info_tree->model) gtk_tree_store_clear(GTK_TREE_STORE(shell->info_tree->model));
+        //if(shell->info_tree && shell->info_tree->view) gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(shell->info_tree->view), FALSE);
+  }
 }
 
 void shell_clear_timeouts(Shell *shell)
@@ -351,63 +355,62 @@ static void destroy_me(void){
 
 #if GTK_CHECK_VERSION(3, 0, 0)
 int update=0;
-int schemeDark=0;
-int changed2dark=0;
 int newgnome=0;
+gchar *ng_theme=NULL,*og_theme=NULL,*ogi_theme=NULL;
 static void stylechange2_me(void)
 {
-  if(update==1){
+  if(update>=1){
     GtkStyleContext *sctx=gtk_widget_get_style_context(GTK_WIDGET(shell->window));
     GdkRGBA color;
-    gtk_style_context_lookup_color(sctx, "theme_bg_color", &color);
+    gtk_style_context_lookup_color(sctx, "theme_text_color", &color);
     gint darkmode=0;
-    if((color.red+color.green+color.blue)<=1.5) darkmode=1;
+    if((color.red+color.green+color.blue)>=1.5) darkmode=1;
+    //printf("STYLEUPDATE: Color=%3.1f dark=%d update=%d\n",color.red+color.green+color.blue,darkmode,update);
     //
-    if(schemeDark && (!darkmode) ) {
+    if((update==2) && params.darkmode && (!darkmode) ) {
         if(newgnome){
-            darkmode=1;
-            //g_print("We need to change GTK_THEME to dark\n");
+	    //printf("We need to change GTK_THEME to dark\n");
             GtkSettings *set;
 	    set=gtk_settings_get_default();
 	    g_object_set(set,"gtk-theme-name","HighContrastInverse", NULL);
-	    changed2dark=1;
+	    //update theme
+	    cb_disable_theme();
+	    gtk_style_context_lookup_color(sctx, "theme_text_color", &color);
+	    darkmode=0;
+	    if((color.red+color.green+color.blue)>=1.5) darkmode=1;
+	    //printf("STYLEUPDATE2: Color=%3.1f dark=%d update=%d\n",color.red+color.green+color.blue,darkmode,update);
 	}
     }
-    if( (!schemeDark) && darkmode && changed2dark ) {
+    if((update==2) && !params.darkmode && darkmode){
         if(newgnome){
-	    darkmode=0;
-            //g_print("We need to change GTK_THEME to light\n");
+	    //printf("We need to change GTK_THEME to light\n");
             GtkSettings *set;
 	    set=gtk_settings_get_default();
 	    g_object_set(set,"gtk-theme-name","Adwaita", NULL);
-	    changed2dark=0;
+	    //update theme
+	    cb_disable_theme();
+	    gtk_style_context_lookup_color(sctx, "theme_text_color", &color);
+	    darkmode=0;
+	    if((color.red+color.green+color.blue)>=1.5) darkmode=1;
+	    //printf("STYLEUPDATE2: Color=%3.1f dark=%d update=%d\n",color.red+color.green+color.blue,darkmode,update);
 	}
     }
-    //
-    if(darkmode!=params.darkmode){
+    //Wrong dark/light fixing
+    if((darkmode!=params.darkmode) && (update==1)){
         params.darkmode=darkmode;
-        //g_print("COLOR %f %f %f, schemeDark=%i -> DARKMODE=%d\n",color.red,color.green,color.blue,schemeDark, params.darkmode);
+        //printf("FIXING - COLOR %f %f %f, DARKMODE=%d\n",color.red,color.green,color.blue, params.darkmode);
         //update theme
         cb_disable_theme();
     }
-    //
   }
-  update=0;
+  if(update) update--;
 }
 
 //gsettings
-static void stylechange3_me(void)
+static void stylechange_signal(void)
 {
-    gchar *theme=NULL,*scale=NULL;
-    int newDark=0,i=0;
-    gchar **keys=NULL;
-    if(settings && !newgnome) keys=g_settings_list_keys(settings);
-    while(!newgnome && keys && (keys[i]!=NULL)){
-        if(strcmp(keys[i],"color-scheme")==0) newgnome=1;
-        i++;
-    }
-    if(keys) g_strfreev(keys);
-
+    int newDark=-1;
+    //printf("Stylechange_signal %s %s %s\n",(ng_theme?ng_theme:"X"),(og_theme?og_theme:"X"),(ogi_theme?ogi_theme:"X"));
     //new gnome using only normal/dark mode
     if(settings){
         //FIXME get dynamic scaling info
@@ -415,35 +418,64 @@ static void stylechange3_me(void)
 	//if(scale) sscanf(scale,"%f",&params.scale);
 
         if(newgnome){
-            theme = g_settings_get_string(settings, "color-scheme");
-            if(strstr(theme,"Dark")||strstr(theme,"dark")) newDark=1;
-        } else {//older gnome using themes with dark in theme-name
-            theme = g_settings_get_string(settings, "gtk-theme");//normal
-            if(strstr(theme,"Dark")||strstr(theme,"dark")) newDark=1;
-            g_free(theme);
-            theme = g_settings_get_string(settings, "icon-theme");//alternative
-            if(strstr(theme,"Dark")||strstr(theme,"dark")) newDark=1;
+            gchar *theme = g_settings_get_string(settings, "color-scheme");
+	    if(ng_theme && theme && strcmp(ng_theme, theme)){
+	        if(ng_theme) g_free(ng_theme);
+	        ng_theme=theme;
+                if(strstr(theme,"Dark")||strstr(theme,"dark")) newDark=1;
+                if(strstr(theme,"Light")||strstr(theme,"light")||strstr(theme,"default")) newDark=0;
+	        //printf("NewDARK NewGnome=%s Dark=%d\n", theme, newDark);
+	    } else g_free(theme);
+	}
+	//older gnome using themes with dark in theme-name
+	if(newDark==-1){
+	    gchar *theme = g_settings_get_string(settings, "gtk-theme");
+	    if(og_theme && theme && strcmp(og_theme, theme)){
+	        newDark=0;
+		if(og_theme) g_free(og_theme);
+		og_theme=theme;
+		if(strstr(theme,"Dark")||strstr(theme,"dark")) {newDark=1;}
+		//printf("NewDARK OldGTK-Theme=%s Dark=%d\n", theme, newDark);
+	    } else g_free(theme);
         }
-        g_free(theme);
+	//older gnome using themes with dark in theme-name
+	if(newDark==-1){
+	    gchar *theme = g_settings_get_string(settings, "icon-theme");
+	    if(ogi_theme && theme && strcmp(ogi_theme, theme)){
+	        newDark=0;
+		if(ogi_theme) g_free(ogi_theme);
+		ogi_theme=theme;
+		if(strstr(theme,"Dark")||strstr(theme,"dark")) {newDark=1;}
+		//printf("NewDARK OldIcon-Theme=%s Dark=%d\n", theme, newDark);
+	    } else g_free(theme);
+        }
     }
     //
-    if(newDark){
-      if(schemeDark!=1) if(!update) update=1;
-        schemeDark=1;
-    }else{
-        if(schemeDark!=0) if(!update) update=1;
-        schemeDark=0;
+    if(newDark==1){
+        if(params.darkmode!=1) {
+	    //printf("Change to dark\n");
+	    params.darkmode=1;
+            update=2;
+        }
+    }else if(newDark==0) {
+        if(params.darkmode!=0) {
+	    //printf("Change to Light\n");
+	    params.darkmode=0;
+            update=2;
+        }
     }
-    //g_print("schemeDark=%i -> Update=%d\n",schemeDark,update);
-    shell_do_reload(false);
-    stylechange2_me();
+    if(newDark!=-1){
+        shell_do_reload(false);
+        stylechange2_me();
+    }
 }
 
 //GTK-signal
-static void stylechange_me(void)
+static void stylechange_updated(void)
 {
-    update=1;
-    //g_print("GTK style signal -> Update=%d\n",update);
+    if(!update) update=1;
+    //printf("GTK style signal -> Check Update=%d\n",update);
+    stylechange2_me();
 }
 #endif
 
@@ -537,14 +569,36 @@ static void create_window(void)
     g_signal_connect(G_OBJECT(shell->window), "destroy", G_CALLBACK(destroy_me), NULL);
     g_signal_connect(G_OBJECT(shell->window), "delete-event", G_CALLBACK(destroy_event), NULL);
 #if GTK_CHECK_VERSION(3, 0, 0)
-    g_signal_connect(G_OBJECT(shell->window), "style-updated", stylechange_me, NULL);
-    g_signal_connect_after(G_OBJECT(shell->window), "draw", stylechange2_me, NULL);
-    update=-1;
+    //Get Darkmode
+    GtkStyleContext *sctx=gtk_widget_get_style_context(GTK_WIDGET(shell->window));
+    GdkRGBA color;
+    gtk_style_context_lookup_color(sctx, "theme_text_color", &color);
+    if((color.red+color.green+color.blue)>=1.5) params.darkmode=1;
+    //printf("INIT PARAM.DARKMODE Color=%3.1f =>%d\n",color.red+color.green+color.blue,params.darkmode);
+    //
+    g_signal_connect(G_OBJECT(shell->window), "style-updated", stylechange_updated, NULL);
+    //g_signal_connect_after(G_OBJECT(shell->window), "draw", stylechange_updated, NULL);
     if(g_settings_schema_source_lookup(g_settings_schema_source_get_default(),"org.gnome.desktop.interface",FALSE))
         settings=g_settings_new("org.gnome.desktop.interface");
-    if(settings) g_signal_connect_after(settings,"changed",stylechange3_me,NULL);
-    stylechange3_me();
-    update=0;
+    if(settings) g_signal_connect_after(settings,"changed",stylechange_signal,NULL);
+    if(settings) {//get settings about newgnome
+        gchar **keys=NULL;
+	int i=0;
+	if(!newgnome) keys=g_settings_list_keys(settings);
+	while(!newgnome && keys && (keys[i]!=NULL)){
+	    if(strcmp(keys[i],"color-scheme")==0) newgnome=1;
+	    i++;
+	}
+	if(keys) g_strfreev(keys);
+	//register settings at startup
+	//printf("Init GSettings newgnome=%d\n",newgnome);
+	if(newgnome) {
+	    ng_theme = g_settings_get_string(settings, "color-scheme");
+	    if(strstr(ng_theme,"Dark")||strstr(ng_theme,"dark")) {params.darkmode=1;update=2;}
+	}
+	og_theme = g_settings_get_string(settings, "gtk-theme");//normal
+	ogi_theme = g_settings_get_string(settings, "icon-theme");//alternate
+    }
 #endif
 
 #if GTK_CHECK_VERSION(3, 0, 0)
@@ -651,10 +705,7 @@ static void create_window(void)
     if(!check_program("glxinfo"))                                 {p=pkgok;pkgok=g_strconcat("glxinfo / mesa-utils\n", pkgok, NULL);g_free(p);}
     if(strstr(PACK_REQ,"iperf") && !check_program("iperf3"))      {p=pkgok;pkgok=g_strconcat("iperf3\n", pkgok, NULL);g_free(p);}
     if(strstr(PACK_REQ,"sysbench") && !check_program("sysbench")) {p=pkgok;pkgok=g_strconcat("sysbench\n", pkgok, NULL);g_free(p);}
-#if(HARDINFO2_QT5)
-    //no binary in qt5-base package
-    //if(!check_program("qmake-qt5")) {p=pkgok;pkgok=g_strconcat("qt5-base\n", pkgok, NULL);g_free(p);}
-#endif
+    //no binary in qt5/6-base package
     //randr optional
     //if(strstr(PACK_REQ,"randr") && !check_program("xrandr"))      {p=pkgok;pkgok=g_strconcat("xrandr\n", pkgok, NULL);g_free(p);}
     //fwupd optional
@@ -674,7 +725,7 @@ static void create_window(void)
     }
 }
 
-static void view_menu_select_entry(gpointer data, gpointer data2)
+/*static void view_menu_select_entry(gpointer data, gpointer data2)
 {
     GtkTreePath *path;
     GtkTreeIter *iter = (GtkTreeIter *) data2;
@@ -685,7 +736,7 @@ static void view_menu_select_entry(gpointer data, gpointer data2)
     gtk_tree_view_set_cursor(GTK_TREE_VIEW(shell->tree->view), path, NULL,
 			     FALSE);
     gtk_tree_path_free(path);
-}
+}*/
 
 
 void shell_add_modules_to_gui(gpointer _shell_module, gpointer _shell_tree)
@@ -890,6 +941,7 @@ void shell_init(GSList * modules)
     shell_action_set_property("ReportAction", "is-important", TRUE);
     shell_action_set_property("SyncManagerAction", "is-important", TRUE);
     shell_action_set_property("UpdateAction", "is-important", TRUE);
+
 
     path = g_build_filename(g_get_user_config_dir(), "hardinfo2","blobs-update-version.json", NULL);
     fd = open(path,O_RDONLY);
@@ -1581,7 +1633,7 @@ static void update_progress()
 void shell_set_note_from_entry(ShellModuleEntry * entry)
 {
     if (entry->notefunc) {
-	const gchar *note = module_entry_get_note(entry);
+        const gchar *note = module_entry_get_note(entry);
 
 	if (note) {
 	    gtk_label_set_markup(GTK_LABEL(shell->note->label), note);
@@ -2434,7 +2486,8 @@ gboolean key_label_is_escaped(const gchar *key) {
 
 gchar *key_mi_tag(const gchar *key) {
     static char flag_list[] = "*!^@";
-    gchar *p = (gchar*)key, *l, *t;
+    gchar *p = (gchar*)key, *t;
+    const gchar *l;
 
     if (key_is_flagged(key)) {
         l = strchr(key+1, '$');

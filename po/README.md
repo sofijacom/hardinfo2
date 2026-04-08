@@ -14,19 +14,21 @@ Status
 This is an example of status of the different languages including your own after
 editing - use the ./updatepo.sh
 
-hardinfo2.pot now has 1331 strings (+2), with 63 c-format strings
-(as of fbbbe9ad-dirty fbbbe9ad1f8ed4486bf7a059f07b9c25d50a4375)
-- [ ] da.po : (3 / 1331 remain untranslated, needs work/fuzzy: 0)
-- [ ] de.po : (858 / 1331 remain untranslated, needs work/fuzzy: 2)
-- [ ] es.po : (456 / 1331 remain untranslated, needs work/fuzzy: 18)
-- [ ] fr.po : (850 / 1331 remain untranslated, needs work/fuzzy: 0)
-- [ ] hu.po : (1167 / 1331 remain untranslated, needs work/fuzzy: 0)
-- [ ] ko.po : (230 / 1331 remain untranslated, needs work/fuzzy: 0)
-- [ ] pt_BR.po : (25 / 1331 remain untranslated, needs work/fuzzy: 0)
-- [ ] pt.po : (219 / 1331 remain untranslated, needs work/fuzzy: 0)
-- [x] ru.po : (0 / 1331 remain untranslated, needs work/fuzzy: 0)
-- [ ] tr.po : (20 / 1331 remain untranslated, needs work/fuzzy: 0)
-- [ ] zh_CN.po : (935 / 1331 remain untranslated, needs work/fuzzy: 0)
+hardinfo2.pot now has 1314 strings (-19), with 65 c-format strings
+- [ ] da.po : (10 / 1314 remain untranslated, needs work/fuzzy: 0)
+- [ ] de.po : (856 / 1314 remain untranslated, needs work/fuzzy: 2)
+- [ ] es.po : (467 / 1314 remain untranslated, needs work/fuzzy: 18)
+- [ ] fr.po : (672 / 1314 remain untranslated, needs work/fuzzy: 0)
+- [ ] hu.po : (1151 / 1314 remain untranslated, needs work/fuzzy: 0)
+- [ ] ka.po : (268 / 1314 remain untranslated, needs work/fuzzy: 0)
+- [ ] ko.po : (241 / 1314 remain untranslated, needs work/fuzzy: 0)
+- [ ] pt_BR.po : (37 / 1314 remain untranslated, needs work/fuzzy: 0)
+- [ ] pt.po : (231 / 1314 remain untranslated, needs work/fuzzy: 0)
+- [x] ru.po : (0 / 1314 remain untranslated, needs work/fuzzy: 0)
+- [ ] sv.po : (15 / 1314 remain untranslated, needs work/fuzzy: 1)
+- [ ] tr.po : (33 / 1314 remain untranslated, needs work/fuzzy: 0)
+- [ ] ua.po : (1 / 1314 remain untranslated, needs work/fuzzy: 0)
+- [ ] zh_CN.po : (865 / 1314 remain untranslated, needs work/fuzzy: 0)
 
 Needs work/fuzzy typically has to do with spaces/periods at begin/end of translation.
 

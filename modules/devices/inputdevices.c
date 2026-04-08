@@ -29,11 +29,17 @@ static struct {
     char *icon;
 } input_devices[] = {
     { NULL,       "module.svg"   }, // UNKNOWN
-    { "Keyboard", "keyboard.svg" },
+    { "Keyboard", "keyboard.svg" },//1
     { "Joystick", "joystick.svg" },
-    { "Mouse",    "mouse.svg"    },
+    { "Mouse",    "mouse.svg"    },//3
     { "Speaker",  "audio.svg"    },
-    { "Audio",    "audio.svg"    }
+    { "Audio",    "audio.svg"    },//5
+    { "Bluetooth","bluetooth.svg"},
+    { "HDMI",     "monitor.svg"  },//7
+    { "System",   "computer.svg" },
+    { "Wifi",     "wireless.svg" },//9
+    { "Stylus",   "pen.svg"      },
+    { "Touch",    "touch.svg"    }//11
 };
 
 // source: https://elixir.bootlin.com/linux/v5.9/source/include/uapi/linux/input.h#L251
@@ -59,7 +65,7 @@ __scan_input_devices(void)
     vendor_list vl = NULL;
     gchar *tmp, *name = NULL, *phys = NULL;
     gchar *vendor_str = NULL, *product_str = NULL, *vendor_tags = NULL;
-    gint bus = 0, vendor = 0, product = 0, version = 0;
+    gint bus = 0, vendor = 0, product = 0, version = 0, stylus = 0;
     const gchar *bus_str = NULL;
     int d = 0, n = 0;
 
@@ -92,7 +98,9 @@ __scan_input_devices(void)
                     &bus, &vendor, &product, &version);
             break;
         case 'H':
-            if (strstr(tmp, "kbd"))
+            if (strstr(tmp, "sysrq"))
+            d = 8;      //INPUT_SYSTEM;
+            else if (strstr(tmp, "js"))
             d = 1;      //INPUT_KEYBOARD;
             else if (strstr(tmp, "js"))
             d = 2;      //INPUT_JOYSTICK;
@@ -102,21 +110,40 @@ __scan_input_devices(void)
             d = 0;      //INPUT_UNKNOWN;
             break;
         case '\n':
-            if (name && strstr(name, "PC Speaker")) {
-                d = 4;    // INPUT_PCSPKR
-            }
-            if (d == 0 && g_strcmp0(phys, "ALSA")) {
-                d = 5;    // INPUT_AUDIO
-            }
-
-            if (vendor > 0 && product > 0 && g_str_has_prefix(phys, "usb-")) {
-                usb_lookup_ids_vendor_product_str(vendor, product, &vendor_str, &product_str);
-            }
-
             if (bus >= 0 && (guint)bus < sizeof(bus_types) / sizeof(gchar*)) {
                 bus_str = bus_types[bus];
             }
+            if (d == 0){//Name
+	        if(name && strstr(name, "wifi")) {d = 9;}           // INPUT_WIRELESS
+		if(name && strstr(name, "Wifi")) {d = 9;}           // INPUT_WIRELESS
+		if(name && strstr(name, "WiFi")) {d = 9;}           // INPUT_WIRELESS
+		if(name && strstr(name, "WIFI")) {d = 9;}           // INPUT_WIRELESS
+		if(name && strstr(name, "utton")) {d = 1;}          // INPUT_KEYBOARD
+		if(name && strstr(name, "keys")) {d = 1;}           // INPUT_KEYBOARD
+		if(name && strstr(name, "ointer")) {d = 3;}         // MOUSE
+		if(name && strstr(name, "Touch")) {d = 11;}         // Touch
+		if(name && strstr(name, "Stylus")) {d = 10;if(stylus) vendor=-1; else stylus=1;}// Stylus
+		if(name && strstr(name, "PC Speaker")) {d = 4;}     // PCSPKR
+		if(name && strstr(name, "UNKNOWN") && strstr(bus_str,"I²C")) {vendor = -1;}     // Remove
+	    }
+            if (d == 0){//Phys
+		if(phys && strstr(phys, "ALSA")) {d = 5;}           // INPUT_AUDIO
+	    }
+            if (d == 0){//Bus
+		if(bus_str && strstr(bus_str, "Bluetooth")) {d = 6;}// INPUT_BLUETOOTH
+	    }
 
+            if (vendor > 0 && product > 0 && strstr(bus_str,"USB")) {
+                usb_lookup_ids_vendor_product_str(vendor, product, &vendor_str, &product_str);
+            }
+            if (vendor > 0 && strstr(bus_str,"I²C")) {
+	        gchar *st=NULL;
+                usb_lookup_ids_vendor_product_str(vendor, 0, &vendor_str, &st);
+		if(st) g_free(st);
+		if(name && (d == 0)) {vendor = -1;}                  // Remove
+            }
+
+	  if (vendor >= 0) {
             vl = vendor_list_remove_duplicates_deep(vendors_match(name, vendor_str, NULL));
             vendor_tags = vendor_list_ribbon(vl, params.fmt_opts);
 
@@ -134,8 +161,8 @@ __scan_input_devices(void)
                     /* Name */   "$^$%s=%s\n"
                     /* Type */   "%s=%s\n"
                     /* Bus */    "%s=[0x%x] %s\n"
-                    /* Vendor */ "$^$%s=[0x%x] %s\n"
-                    /* Product */"%s=[0x%x] %s\n"
+                    /* Vendor */ "$^$%s=[0x%04x] %s\n"
+                    /* Product */"%s=[0x%04x] %s\n"
                     /* Version */"%s=0x%x\n",
                             _("Device Information"),
                             _("Name"), name,
@@ -152,9 +179,9 @@ __scan_input_devices(void)
             if (phys && strstr(phys, "ir")) {
                 strhash = h_strdup_cprintf("%s=%s\n", strhash, _("InfraRed port"), _("Yes") );
             }
-
             moreinfo_add_with_prefix("DEV", tmp, strhash);
             g_free(tmp);
+	  }
             g_free(phys);
             g_free(name);
             g_free(vendor_str);

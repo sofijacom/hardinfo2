@@ -100,10 +100,12 @@ struct _ModuleAbout {
 
 /* String utility functions */
 void   remove_quotes(gchar *str);
-char  *strend(gchar *str, gchar chr);
+void   strend(gchar *str, gchar chr);
 void   remove_linefeed(gchar *str);
+gchar *strreplace_chr(gchar *string, gchar replace, gchar new_char);
 gchar *strreplacechr(gchar *string, gchar *replace, gchar new_char);
 gchar *strreplace(gchar *string, gchar *replace, gchar *replacement);
+gchar* fixline(gchar *st, gchar* handle_line(gchar*));
 
 /* Widget utility functions */
 void widget_set_cursor(GtkWidget *widget, GdkCursorType cursor_type);
@@ -117,6 +119,7 @@ gchar    *file_chooser_build_filename(GtkWidget *chooser, gchar *extension);
 gpointer  file_types_get_data_by_name(FileTypes *file_types, gchar *name);
 
 /* Misc utility functions */
+int          get_systype(void);
 gchar	     *find_program(gchar *program_name);
 gboolean     check_program(gchar *program_name);
 gchar        *size_human_readable(gfloat size);
@@ -124,7 +127,7 @@ void          nonblock_sleep(guint msec);
 GSList	     *modules_get_list(void);
 GSList	     *modules_load_selected(void);
 GSList       *modules_load_all(void);
-void	      module_unload_all(void);
+void	      module_unload_all(GSList *modules);
 gchar        *seconds_to_string(unsigned int seconds);
 
 gchar        *h_strdup_cprintf(const gchar *format, gchar *source, ...)

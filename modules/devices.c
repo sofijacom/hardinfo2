@@ -73,7 +73,7 @@ void scan_dtree(gboolean reload);
 void scan_device_resources(gboolean reload);
 
 gboolean root_required_for_resources(void);
-gboolean spd_decode_show_hinote(const char**);
+gchar *spd_decode_show_hinote(void);
 
 gchar *hi_more_info(gchar *entry);
 
@@ -133,18 +133,18 @@ gchar *gpuname=NULL;
 gchar *memory_devices_get_info();
 gchar *memory_devices_get_system_memory_types_str();
 gchar *memory_devices_get_system_memory_str();
-gboolean memory_devices_hinote(const char **msg);
+gchar *memory_devices_hinote(void);
 gchar *memory_devices_info = NULL;
 gchar *memory_devices_desc = NULL;
 
 /* in firmware.c */
 gchar *firmware_get_info();
-gboolean firmware_hinote(const char **msg);
+gchar *firmware_hinote(void);
 gchar *firmware_info = NULL;
 
 /* in monitors.c */
 gchar *monitors_get_info();
-gboolean monitors_hinote(const char **msg);
+gchar *monitors_hinote(void);
 gchar *monitors_info = NULL;
 
 #include <vendor.h>
@@ -201,7 +201,6 @@ gchar *processor_name_default(GSList * processors)
     GSList *tmp, *l;
     Processor *p;
     gchar *cur_str = NULL;
-    gint cur_count = 0;
 
     tmp = g_slist_copy(processors);
     tmp = g_slist_sort(tmp, (GCompareFunc)proc_cmp_model_name);
@@ -210,14 +209,10 @@ gchar *processor_name_default(GSList * processors)
         p = (Processor*)l->data;
         if (cur_str == NULL) {
             cur_str = p->model_name;
-            cur_count = 1;
         } else {
             if(g_strcmp0(cur_str, p->model_name)) {
                 ret = h_strdup_cprintf("%s%s", ret, strlen(ret) ? "; " : "", cur_str);
                 cur_str = p->model_name;
-                cur_count = 1;
-            } else {
-                cur_count++;
             }
         }
     }
@@ -368,14 +363,14 @@ gchar *get_storage_devices_simple(void)
         if (!group)
             continue;
 
-        info_group_strip_extra(group);
         for (fi = 0; fi < group->fields->len; fi++) {
             field = &g_array_index(group->fields, struct InfoField, fi);
             if (!field->value)
                 continue;
 
-            tmp = g_regex_replace(regex, field->value, -1, 0, "", 0, NULL); // remove html tags
+            tmp = g_regex_replace(regex, field->value, -1, 0, "", 0, NULL); // remove html tags 
 	    tmp=strreplace(tmp,"  "," ");
+	    tmp=strreplace(tmp,"|"," ");
             storage_devs = h_strdup_cprintf("%s\n", storage_devs, g_strstrip(tmp));
             g_free(tmp);
         }
@@ -396,8 +391,8 @@ gchar *get_storage_home_models(void)
     GRegex *regex;
     gchar *homepath=NULL,*out=NULL,*err=NULL;
     gboolean spawned;
-    const char cmd_line[] = "sh -c 'cd ~;df --output=source . |tail -1'";
-    const char cmd_line1disk[] = "sh -c 'lsblk -l |grep disk|grep -v zram'";
+    const char cmd_line[] = "sh -c 'cd ~;df -a . |tail -1'";
+    const char cmd_line1disk[] = "sh -c 'lsblk -l |grep disk|grep -v zram|grep -v mtdblock|grep -v boot0|grep -v boot1'";
     char cmd_lineblk[100];
 
     //lookup home disk by df - only works on newer machines
@@ -412,8 +407,6 @@ gchar *get_storage_home_models(void)
 	    g_free(err);
             spawned = g_spawn_command_line_sync(cmd_lineblk, &out, &err, NULL, NULL);
 	    if(spawned && out){
-	        p=strstr(out," ")+1;//note: field 4 is size
-	        *p=0;
 	        homepath=g_strdup(out);
 	    }
 	}
@@ -425,8 +418,6 @@ gchar *get_storage_home_models(void)
         spawned = g_spawn_command_line_sync(cmd_line1disk, &out, &err, NULL, NULL);
         if(spawned && out){
 	    if(strstr(out,"disk") && (strstr(out,"\n")==(out+strlen(out)-1)) ) {
-	        p=strstr(out," ")+1;//note: field 4 is size
-		*p=0;
                 homepath=strdup(out);
 	    }
         }
@@ -434,9 +425,9 @@ gchar *get_storage_home_models(void)
         g_free(err);
     }
     if(!homepath) return g_strdup("NoHomePath");
-    homepath[strlen(homepath)-1]=0;
+    if( (p=strstr(homepath," ")) ) *p=0;
+    if( !strstr(homepath,"sdp") && !strstr(homepath,"vdp") && (p=strstr(homepath,"p")) ) *p=0;
     while(homepath[strlen(homepath)-1]>='0' && homepath[strlen(homepath)-1]<='9') homepath[strlen(homepath)-1]=0;
-    if( !strstr(homepath,"sdp") && !strstr(homepath,"vdp") && (homepath[strlen(homepath)-1]=='p') ) homepath[strlen(homepath)-1]=0;
     //printf("Homepath=%s (%u)\n",homepath,(unsigned int)strlen(homepath));
 
     regex = g_regex_new ("<.*?>", 0, 0, NULL);
@@ -1126,6 +1117,8 @@ void hi_module_init(void)
 
 void hi_module_deinit(void)
 {
+    g_free(dtree_info);
+
     moreinfo_del_with_prefix("DEV");
     sensor_shutdown();
     storage_shutdown();
@@ -1154,39 +1147,36 @@ gchar **hi_module_get_dependencies(void)
 
 const gchar *hi_note_func(gint entry)
 {
-    if (entry == ENTRY_PCI
-        || entry == ENTRY_GPU) {
+    if ((entry == ENTRY_PCI) || (entry == ENTRY_GPU)) {
             const gchar *ids = find_pci_ids_file();
             if (!ids) {
-                return g_strdup(_("A copy of <i><b>pci.ids</b></i> is not available on the system."));
+                return _("A copy of <i><b>pci.ids</b></i> is not available on the system.");
             }
             if (ids && strstr(ids, ".min")) {
-                return g_strdup(_("A full <i><b>pci.ids</b></i> is not available on the system."));
+                return _("A full <i><b>pci.ids</b></i> is not available on the system.");
             }
+	return NULL;
     }
     if (entry == ENTRY_RESOURCES) {
         if (root_required_for_resources()) {
-            return g_strdup(_("Ensure hardinfo2 service is enabled+started: sudo systemctl enable hardinfo2 --now (SystemD distro)\nAdd yourself to hardinfo2 group: sudo usermod -a -G hardinfo2 YOUR_LOGIN\nAnd Logout/Reboot for groups to be updated..."));
+	    int systype=get_systype();
+	    if(systype<0) return _("Ensure hardinfo2 service is enabled+started: sudo systemctl enable hardinfo2 --now (SystemD distro)");
+	    return _("Add yourself to hardinfo2 group:\nsudo usermod -a -G hardinfo2 $USER\nLogout/Reboot for groups to be updated...");
         }
+	return NULL;
     }
-    else if (entry == ENTRY_STORAGE){
+    if (entry == ENTRY_STORAGE){
         if (storage_no_nvme) {
-            return g_strdup(
-                _("Any NVMe storage devices present are not listed.\n"
-                  "<b><i>udisks2</i></b> is required for NVMe devices."));
+            return _("Any NVMe storage devices present are not listed.\n"
+                  "<b><i>udisks2</i></b> is required for NVMe devices.");
         }
+	return NULL;
     }
-    else if (entry == ENTRY_DMI_MEM){
-        const char *msg;
-        if (memory_devices_hinote(&msg)) {
-            return msg;
-        }
+    if (entry == ENTRY_DMI_MEM){
+        return memory_devices_hinote();
     }
-    else if (entry == ENTRY_FW) {
-        const char *msg;
-        if (firmware_hinote(&msg)) {
-            return msg;
-        }
+    if (entry == ENTRY_FW) {
+        return firmware_hinote();
     }
     return NULL;
 }

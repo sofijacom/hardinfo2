@@ -21,7 +21,9 @@
 
 #include "qglgears.h"
 #include <QTimer>
+#include "config.h"
 
+#if(HARDINFO2_QT5)
 QGLGears::QGLGears()
   : QGLWidget(QGLFormat(QGL::SampleBuffers), 0)
 {
@@ -29,16 +31,38 @@ QGLGears::QGLGears()
     newFormat.setSampleBuffers(0);
     newFormat.setSwapInterval(0);
     QGLGears::setFormat(newFormat);
-
     setFixedSize(1024, 800);
     setMinimumSize(1024, 800);
     setMaximumSize(1024, 800);
     setSizePolicy(QSizePolicy::Fixed,QSizePolicy::Fixed);
 }
+#endif
+#if(HARDINFO2_QT6)
+QGLGears::QGLGears()
+  : QOpenGLWidget()
+{
+    QSurfaceFormat newFormat;
+    newFormat.setSamples(-1);
+    newFormat.setRenderableType(QSurfaceFormat::OpenGL);
+    newFormat.setSwapBehavior(QSurfaceFormat::SingleBuffer);
+    newFormat.setSwapInterval(0);
+    newFormat.setDepthBufferSize(0);
+    newFormat.setDefaultFormat(newFormat);
+    setFormat(newFormat);
+    setAttribute(Qt::WA_AlwaysStackOnTop);
+    QPalette p(palette());
+    p.setColor(QPalette::Base, Qt::black);
+    setAutoFillBackground(true);
+    setPalette(p);
+    setFixedSize(1024, 800);
+    setMinimumSize(1024, 800);
+    setMaximumSize(1024, 800);
+    setSizePolicy(QSizePolicy::Fixed,QSizePolicy::Fixed);
+}
+#endif
 
 void QGLGears::paintEvent(QPaintEvent *)
 {
-
     renderTo(this);
     QTimer::singleShot(0, this, SLOT(repaint()));
 }

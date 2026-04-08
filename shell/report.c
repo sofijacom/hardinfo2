@@ -115,7 +115,7 @@ gchar *make_icon_css(const gchar *file) {
         const char *ctype = "image/png";
         if (g_str_has_suffix(file, ".svg") )
             ctype = "image/svg+xml";
-        gchar *b64data = g_base64_encode(contents, length);
+        gchar *b64data = g_base64_encode((unsigned char*)contents, length);
         ret = g_strdup_printf(
             ".%s\n"
             "{ content: url(data:%s;base64,%s); }\n",
@@ -983,7 +983,7 @@ void report_create_from_module_list(ReportContext * ctx, GSList * modules)
     report_header(ctx);
 
     report_create_inner_from_module_list(ctx, modules);
-    report_module_list_free(modules);
+    if(params.gui_running) report_module_list_free(modules);
 
     report_footer(ctx);
 }

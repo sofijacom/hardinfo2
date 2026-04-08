@@ -33,14 +33,7 @@
 gchar *dtree_info = NULL;
 const char *dtree_mem_str = NULL; /* used by memory devices when nothing else is available */
 
-/* These should really go into CMakeLists.txt */
-#if defined(__arm__)
-#include "devicetree/rpi_data.c"
-#elif defined(__powerpc__)
-#include "devicetree/pmac_data.c"
-#endif
-
-static gchar *get_node(dtr *dt, char *np) {
+/*static gchar *get_node(dtr *dt, char *np) {
     gchar *nodes = NULL, *props = NULL, *ret = NULL;
     gchar *tmp = NULL, *pstr = NULL, *lstr = NULL;
     gchar *dir_path;
@@ -96,7 +89,7 @@ static gchar *get_node(dtr *dt, char *np) {
     g_free(nodes);
 
     return ret;
-}
+ }*/
 
 /* different from  dtr_get_string() in that it re-uses the existing dt */
 static char *get_dt_string(dtr *dt, char *path, gboolean decode) {
@@ -116,90 +109,20 @@ static char *get_dt_string(dtr *dt, char *path, gboolean decode) {
 }
 
 static gchar *get_summary(dtr *dt) {
-    char *model = NULL, *compat = NULL;
+    char *model = NULL, *compat = NULL, *serial_number=NULL;
     char *ret = NULL;
 
     model = get_dt_string(dt, "/model", 0);
     compat = get_dt_string(dt, "/compatible", 1);
+    serial_number = get_dt_string(dt, "/serial-number", 1);
     UNKIFNULL(model);
     EMPIFNULL(compat);
+    EMPIFNULL(serial_number);
+    compat=strreplace(compat,"\", \"","\r");
+    compat=strreplace(compat,"\",\"","\r");
+    compat=strreplace(compat,"\"","");
 
-#if defined(__arm__)
-    /* Expand on the DT information from known machines, like RPi.
-     * RPi stores a revision value in /proc/cpuinfo that can be used
-     * to look up details. This is just a nice place to pull it all
-     * together for DT machines, with a nice fallback.
-     * PPC Macs could be handled this way too. They store
-     * machine identifiers in /proc/cpuinfo. */
-    if (strstr(model, "Raspberry Pi")
-        || strstr(compat, "raspberrypi")) {
-        gchar *gpu_compat = get_dt_string(dt, "/soc/gpu/compatible", 1);
-        gchar *rpi_details = rpi_board_details();
-        gchar *basic_info;
-
-        basic_info = g_strdup_printf(
-                "[%s]\n"
-                "%s=%s\n"
-                "%s=%s\n",
-                _("Platform"),
-                _("Compatible"), compat,
-                _("GPU-compatible"), gpu_compat);
-
-        if (rpi_details) {
-            ret = g_strconcat(rpi_details, basic_info, NULL);
-
-            g_free(rpi_details);
-        } else {
-            gchar *serial_number = get_dt_string(dt, "/serial-number", 1);
-
-            ret = g_strdup_printf(
-                "[%s]\n"
-                "%s=%s\n"
-                "%s=%s\n"
-                "%s=%s\n"
-                "%s",
-                _("Raspberry Pi or Compatible"),
-                _("Model"), model,
-                _("Serial Number"), serial_number,
-                _("RCode"), _("No revision code available; unable to lookup model details."),
-                basic_info);
-
-            g_free(serial_number);
-        }
-
-        g_free(gpu_compat);
-        g_free(basic_info);
-    }
-#endif
-
-#if defined(__powerpc__)
-    /* Power Macintosh */
-    if (strstr(compat, "PowerBook") != NULL
-         || strstr(compat, "MacRISC") != NULL
-         || strstr(compat, "Power Macintosh") != NULL) {
-        gchar *mac_details = ppc_mac_details();
-
-        if (mac_details) {
-            gchar *serial_number = get_dt_string(dt, "/serial-number", 1);
-
-            ret = g_strdup_printf(
-                "%s[%s]\n"
-                "%s=%s\n",
-                mac_details,
-                _("More"),
-                _("Serial Number"), serial_number);
-
-            free(mac_details);
-            free(serial_number);
-        }
-    }
-#endif
-
-    /* fallback */
-    if (!ret) {
-        gchar *serial_number = get_dt_string(dt, "/serial-number", 1);
-        EMPIFNULL(serial_number);
-        ret = g_strdup_printf(
+    ret = g_strdup_printf(
                 "[%s]\n"
                 "%s=%s\n"
                 "%s=%s\n"
@@ -208,11 +131,10 @@ static gchar *get_summary(dtr *dt) {
                 _("Model"), model,
                 _("Serial Number"), serial_number,
                 _("Compatible"), compat);
-        free(serial_number);
-    }
 
-    free(model);
-    free(compat);
+    g_free(serial_number);
+    g_free(model);
+    g_free(compat);
 
     return ret;
 }
@@ -231,7 +153,7 @@ static void mi_add(const char *key, const char *value, int report_details) {
     g_free(rkey);
 }
 
-static void add_keys(dtr *dt, char *np) {
+/*static void add_keys(dtr *dt, char *np) {
     gchar *dir_path, *dt_path;
     gchar *ftmp, *ntmp;
     gchar *n_info;
@@ -241,7 +163,7 @@ static void add_keys(dtr *dt, char *np) {
 
     dir_path = g_strdup_printf("%s/%s", dtr_base_path(dt), np);
     dir = g_dir_open(dir_path, 0 , NULL);
-    if(!dir){ /* add self */
+    if(!dir){ // add self
         obj = dtr_obj_read(dt, np);
         dt_path = dtr_obj_path(obj);
         n_info = get_node(dt, dt_path);
@@ -262,9 +184,9 @@ static void add_keys(dtr *dt, char *np) {
         g_dir_close(dir);
     }
     g_free(dir_path);
-}
+}*/
 
-static char *msg_section(dtr *dt, int dump) {
+/*static char *msg_section(dtr *dt, int dump) {
     gchar *aslbl = NULL;
     gchar *messages = dtr_messages(dt);
     gchar *ret = g_strdup_printf("[%s]", _("Messages"));
@@ -281,26 +203,71 @@ static char *msg_section(dtr *dt, int dump) {
         printf("%s", messages);
     g_free(messages);
     return ret;
+}*/
+
+
+/* kvl: 0 = key is label, 1 = key is v */
+char* dtr_map_info_section(dtr *s, dtr_map *map, char *title, int kvl) {
+    gchar *tmp, *ret;
+    const gchar *sym;
+    ret = g_strdup_printf("[%s]\n", _(title));
+    dtr_map *it = map, *ali;
+    while(it != NULL) {
+        if (kvl & 1) {
+	    ali = s->symbols;
+	    sym=NULL;
+	    if(kvl & 2) while((ali != NULL) && (sym==NULL)) {
+	        if (strcmp(ali->path, it->path) == 0) sym = ali->label;
+		ali = ali->next;
+	    }
+            //sym = dtr_symbol_lookup_by_path(s, it->path);
+            if (sym != NULL)
+                tmp = g_strdup_printf("%s0x%x (%s)=%s\n", ret, it->v, sym, it->path);
+            else
+                tmp = g_strdup_printf("%s0x%x=%s\n", ret, it->v, it->path);
+        } else
+            tmp = g_strdup_printf("%s%s=%s\n", ret, it->label, it->path);
+        g_free(ret);
+        ret = tmp;
+        it = it->next;
+    }
+
+    return ret;
 }
+
 
 void __scan_dtree()
 {
-    dtr *dt = dtr_new(NULL);
-    gchar *summary = get_summary(dt);
-    gchar *maps = dtr_maps_info(dt);
-    gchar *messages = NULL;
+    if(dtree_info) g_free(dtree_info);
+    dtr *dt = dtr_new(NULL); 
+    if(!dtr_was_found(dt)){//Hide device tree on machines without
+        dtree_info=g_strdup("");
+	if(dt) dtr_free(dt);
+    } else {
+        gchar *summary = get_summary(dt);
+	gchar *mem = dtr_map_info_section(dt,dt->phandles,_("Memory Map"),3);
+	gchar *irq = dtr_map_info_section(dt,dt->irqs,_("IRQ Map"),1);
+	gchar *alias = dtr_map_info_section(dt,dt->aliases,_("Alias Map"),0);
+	gchar *symbol = dtr_map_info_section(dt,dt->symbols,_("Symbol Map"),0);
+	//gchar *messages = NULL;
 
-    dtree_info = g_strdup("[Device Tree]\n");
-    mi_add("Summary", summary, 1);
-    mi_add("Maps", maps, 0);
+	dtree_info = g_strdup("[Device Tree]\n");
+	mi_add("Summary", summary, 1);
+	mi_add("Memory Map", mem, 0);
+	mi_add("IRQ Map", irq, 0);
+	mi_add("Alias Map", alias, 0);
+	mi_add("Symbol Map", symbol, 0);
 
-    if(dtr_was_found(dt))
-        add_keys(dt, "/");
-    messages = msg_section(dt, 0);
-    mi_add("Messages", messages, 0);
+	//if(dtr_was_found(dt)) add_keys(dt, "/");
+	//messages = msg_section(dt, 0);
+	//mi_add("Messages", messages, 0);
 
-    g_free(summary);
-    g_free(maps);
-    g_free(messages);
-    dtr_free(dt);
+	g_free(summary);
+	g_free(mem);
+	g_free(irq);
+	g_free(alias);
+	g_free(symbol);
+	//g_free(messages);
+	dtr_free(dt);
+    }
 }

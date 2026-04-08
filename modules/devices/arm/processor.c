@@ -598,6 +598,7 @@ gchar *processor_name(GSList *processors) {
         char *vendor;
         char *soc;
     } dt_compat_searches[] = { 
+        { "allwinner,sun8i-a33", "Allwinner", "A33" },
         { "allwinner,sun8i-h3", "Allwinner", "H3" },
         { "allwinner,sun50i-h616", "Allwinner", "H616" },//Orange PI Zero3
         { "amlogic,a311d", "Amlogic", "A311D (Vim3)" }, // VIM3
@@ -629,8 +630,9 @@ gchar *processor_name(GSList *processors) {
         { "friendlyelec,nanopi-k1-plus", "Allwinner", "H5 (K1+)" }, // K1+
         { "hardkernel,odroid-c2", "Amlogic", "S905 (C2)" }, // C2
         { "hardkernel,odroid-n2", "Amlogic", "S922x (N2)" }, // N2
-        { "mediatek,mt8173", "MediaTek", "MT8173" },
+        { "mediatek,mt8186", "MediaTek", "MT8186" },
         { "mediatek,mt8183", "MediaTek", "MT8183" },
+        { "mediatek,mt8173", "MediaTek", "MT8173" },
         { "mediatek,mt8167", "MediaTek", "MT8167" },
         { "mediatek,mt6895", "MediaTek", "MT6895" },
         { "mediatek,mt6799", "MediaTek", "MT6799 (Helio X30)" },
@@ -658,12 +660,15 @@ gchar *processor_name(GSList *processors) {
         { "qcom,msm", "Qualcomm", "Snapdragon-family"},
         { "qcom,x1e80100", "Qualcomm", "Snapdragon X Elite"},
         { "qcom,x1p42100", "Qualcomm", "Snapdragon X Plus"},
+        { "rockchip,rk3188", "Rockchip", "RK3188" }, // tablets from 2012
         { "rockchip,rk3288", "Rockchip", "RK3288" }, // Asus Tinkerboard
         { "rockchip,rk3328", "Rockchip", "RK3328" }, // Firefly Renegade
         { "rockchip,rk3399", "Rockchip", "RK3399" }, // Firefly Renegade Elite
         { "rockchip,rk32", "Rockchip", "RK32xx-family" },
         { "rockchip,rk33", "Rockchip", "RK33xx-family" },
+        { "rockchip,rk3566", "Rockchip", "RK3566" },
         { "rockchip,rk3588", "Rockchip", "RK3588" }, // rk3588-orangepi-5-max
+        { "samsung,exynos5250", "Samsung", "Exynos 5250" },
         { "sprd,sc9863a", "Unisoc", "SC9864A" },
         { "ti,omap5432", "Texas Instruments", "OMAP5432" },
         { "ti,omap5430", "Texas Instruments", "OMAP5430" },
@@ -687,18 +692,33 @@ gchar *processor_name(GSList *processors) {
         { "qcom,", "Qualcom", UNKSOC },
         { "rockchip,", "Rockchip", UNKSOC },
         { "ti,", "Texas Instruments", UNKSOC },
+        { "samsung,", "Samsung", UNKSOC },
         { NULL, NULL }
     };
     gchar *ret = NULL;
     gchar *compat = NULL;
-    int i;
+    int i, rev=0;
 
     compat = dtr_get_string("/compatible", 1);
+
+    if(!compat) {//search dmesg if no DT - older distros
+        gboolean spawned;
+	gchar *out, *err, *p;
+	spawned = g_spawn_command_line_sync("sh -c 'dmesg -t|grep cpufreq\\  |cut -f 1 -d \\ '", &out, &err, NULL, NULL);
+        rev=1;
+	if (spawned) {
+	    p=out;while(p && *p>' ') p++; if(p) *p=0;
+	    if(strlen(out)>1 && strlen(out)<20) compat = g_strdup_printf(",%s",out);
+	    g_free(out);
+	    g_free(err);
+	}
+    }
 
     if (compat != NULL) {
         i = 0;
         while(dt_compat_searches[i].search_str != NULL) {
-            if (strstr(compat, dt_compat_searches[i].search_str) != NULL) {
+	  if ( (!rev && strstr(compat, dt_compat_searches[i].search_str) != NULL) ||
+	       (rev && strstr(dt_compat_searches[i].search_str, compat) != NULL) ) {
 	        if(strstr(dt_compat_searches[i].soc,"Unknown"))
 		    ret = g_strdup_printf("%s %s (%s)", dt_compat_searches[i].vendor, dt_compat_searches[i].soc, compat);
 		else
@@ -753,6 +773,7 @@ gchar *processor_meta(GSList * processors) {
     g_free(meta_caches);
     return ret;
 }
+
 
 gchar *processor_get_info(GSList * processors)
 {

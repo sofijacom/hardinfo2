@@ -63,11 +63,15 @@ gchar *nvme_pci_sections(pcid *p) {
     if (p->pcie_width_curr) {
         pcie_str = g_strdup_printf("[%s]\n"
                      /* Addy */    "%s=PCI/%s\n"
+                     /* Width (cur) */  "%s=x%u\n"
                      /* Width (max) */  "%s=x%u\n"
+                     /* Speed (cur) */  "%s=%0.1f %s\n"
                      /* Speed (max) */  "%s=%0.1f %s\n",
                     _("PCI Express"),
                     _("Location"), p->slot_str,
+                    _("Link Width"), p->pcie_width_curr,
                     _("Maximum Link Width"), p->pcie_width_max,
+		    _("Link Speed"), p->pcie_speed_curr, _("GT/s"),
                     _("Maximum Link Speed"), p->pcie_speed_max, _("GT/s") );
     } else
         pcie_str = strdup("");
@@ -79,7 +83,7 @@ gchar *nvme_pci_sections(pcid *p) {
 }
 
 gboolean __scan_udisks2_devices(void) {
-    GSList *node, *drives;
+    GSList *node,*nodenext, *drives;
     u2driveext *ext;
     udiskd *disk;
     udiskp *part;
@@ -104,6 +108,7 @@ gboolean __scan_udisks2_devices(void) {
         { "flash_sdhc",             "SDHC",               "media-sd" },
         { "flash_sdxc",             "SDXC",               "media-sd" },
         { "flash_mmc",              "MMC",                "media-sd" },
+        { "flash_mmc_eMMC",         "eMMC",               "chip" },//must be after flash_mmc
         { "floppy",                 "Floppy Disk",        "media-floppy" },
         { "floppy_zip",             "Zip Disk",           "media-floppy" },
         { "floppy_jaz",             "Jaz Disk",           "media-floppy" },
@@ -204,18 +209,38 @@ gboolean __scan_udisks2_devices(void) {
     udisks2_storage_list = g_strdup(_("\n[UDisks2]\n"));
 
     drives = get_udisks2_drives_ext();
+    //remove mmc boot0+1
+    gchar *emmc=NULL;
+    for (node = drives; node != NULL; ) {
+	nodenext = node->next;
+        ext = (u2driveext *)node->data;
+        disk = ext->d;
+	if(strstr(disk->block_dev,"boot0")){
+	    if(!emmc) emmc=strreplace(strdup(disk->block_dev),"boot0","");
+            drives=g_slist_remove(drives, node->data);
+	}
+	if(strstr(disk->block_dev,"boot1")){
+            drives=g_slist_remove(drives, node->data);
+	}
+	node=nodenext;
+    }
+
     for (node = drives; node != NULL; node = node->next) {
         ext = (u2driveext *)node->data;
         disk = ext->d;
         devid = g_strdup_printf("UDISKS%d", n++);
-
+	gchar is_emmc=0;
+        if(emmc && g_strcmp0(disk->block_dev,emmc) == 0) is_emmc=1;
         icon = NULL;
 
         media_curr = disk->media;
         if (disk->media){
             for (j = 0; media_info[j].media != NULL; j++) {
                 if (g_strcmp0(disk->media, media_info[j].media) == 0) {
-                    media_curr = media_info[j].label;
+		    if(!is_emmc)
+                        media_curr = media_info[j].label;
+		    else
+                        media_curr = media_info[j+1].label;
                     break;
                 }
             }
@@ -228,8 +253,9 @@ gboolean __scan_udisks2_devices(void) {
                 for (j = 0; media_info[j].media != NULL; j++) {
                     if (g_strcmp0(disk->media_compatibility[i], media_info[j].media) == 0) {
                         media_label = media_info[j].label;
-                        if (icon == NULL)
-                            icon = media_info[j].icon;
+                        if (icon == NULL) {
+			    if(!is_emmc) icon = media_info[j].icon; else icon=media_info[j+1].icon;
+			}
                         break;
                     }
                 }
@@ -243,7 +269,10 @@ gboolean __scan_udisks2_devices(void) {
             }
         }
         if (icon == NULL && disk->ejectable && g_strcmp0(disk->connection_bus, "usb") == 0) {
-            icon = "usbfldisk";
+	    if(strstr(disk->model,"CRW") || strstr(disk->model,"CARD") || strstr(disk->model,"SD/MMC"))
+	       icon = "media-sd";
+	    else
+	       icon = "media-usb";
         }
         if (icon == NULL){
             icon = "hdd";
@@ -342,6 +371,45 @@ gboolean __scan_udisks2_devices(void) {
                 moreinfo = h_strdup_cprintf("%s", moreinfo, nvme);
             g_free(nvme);
         }
+
+        if (is_emmc) {
+	    gchar *sdate=NULL,*st=NULL,*ssslc,*ssmlc,*sseol,*path;
+	    unsigned int sslc=0, smlc=0, seol=0;
+
+	    g_file_get_contents(path=g_strdup_printf("/sys/block/%s/device/date",disk->block_dev),&sdate,NULL,NULL);g_free(path);
+	    if(g_file_get_contents(path=g_strdup_printf("/sys/block/%s/device/life_time",disk->block_dev),&st,NULL,NULL))
+	        if(sscanf(st,"%x %x",&sslc,&smlc)==2) g_free(st);
+	    g_free(path);
+	    if(g_file_get_contents(path=g_strdup_printf("/sys/block/%s/device/pre_eol_info",disk->block_dev),&st,NULL,NULL))
+	        if(sscanf(st,"%x",&seol)==1) g_free(st);
+	    g_free(path);
+
+	    if(sslc>=1 && sslc<11) ssslc=g_strdup_printf("%u%% - %u%% used", (sslc-1)*10, sslc*10);
+	    else if(sslc==11) ssslc=_("Lifetime exceeded");
+	    else ssslc=_("Unknown");
+
+	    if(smlc>=1 && smlc<11) ssmlc=g_strdup_printf("%u%% - %u%% used", (smlc-1)*10, smlc*10);
+	    else if(smlc==11) ssmlc=_("Lifetime exceeded");
+	    else ssmlc=_("Unknown");
+
+	    if(seol==1) sseol=_("Normal");
+	    else if(seol==2) sseol=_("Warning >80% used");
+	    else if(seol==3) sseol=_("Failing >90% used");
+	    else sseol=_("Unknown");
+
+	    if(seol || smlc || sslc || sdate)
+                moreinfo = h_strdup_cprintf(_("[Self-monitoring ExtCSD]\n"
+                                              "Production Date=%s\n"
+                                              "SLC Flash Status=%s\n"
+                                              "MLC Flash Status=%s\n"
+					      "Pre EOL Status=%s\n"),
+                                              moreinfo,
+					      sdate ? sdate:_("Unknown"),
+					      ssslc,ssmlc,sseol
+					  );
+	    g_free(sdate);
+	}
+
         if (disk->smart_enabled) {
             moreinfo = h_strdup_cprintf(_("[Self-monitoring (S.M.A.R.T.)]\n"
                                         "Status=%s\n"
@@ -355,9 +423,10 @@ gboolean __scan_udisks2_devices(void) {
                                         disk->smart_temperature);
 
             if (disk->smart_attributes != NULL) {
-                moreinfo = h_strdup_cprintf(_("[S.M.A.R.T. Attributes]\n"
-                                            "Attribute=<tt>Value      / Normalized / Worst / Threshold</tt>\n"),
-                                            moreinfo);
+	        if(ext->nvme_controller)
+                    moreinfo = h_strdup_cprintf(_("[S.M.A.R.T. Attributes]\nAttribute=<tt>Value</tt>\n"), moreinfo);
+		else
+                    moreinfo = h_strdup_cprintf(_("[S.M.A.R.T. Attributes]\nAttribute=<tt>Value      / Normalized / Worst / Threshold</tt>\n"), moreinfo);
 
                 attrib = disk->smart_attributes;
 
@@ -372,7 +441,13 @@ gboolean __scan_udisks2_devices(void) {
                             tmp = h_strdup_cprintf("%" G_GINT64_FORMAT " ms", tmp, attrib->interpreted);
                             break;
                         case UDSK_INTPVAL_HOURS:
-                            tmp = h_strdup_cprintf("%" G_GINT64_FORMAT " h", tmp, attrib->interpreted);
+			    if(attrib->interpreted<24){
+			        tmp = h_strdup_cprintf("%" G_GINT64_FORMAT " h", tmp, attrib->interpreted);
+			    } else if (attrib->interpreted<24*365){
+			        tmp = h_strdup_cprintf("%" G_GINT64_FORMAT " days", tmp, attrib->interpreted/24);
+			    } else {
+			      tmp = h_strdup_cprintf("%0.1f years", tmp, (double)attrib->interpreted/24/365);
+			    }
                             break;
                         case UDSK_INTPVAL_CELSIUS:
                             tmp = h_strdup_cprintf("%" G_GINT64_FORMAT "°C", tmp, attrib->interpreted);
@@ -381,6 +456,12 @@ gboolean __scan_udisks2_devices(void) {
                             tmp = h_strdup_cprintf(ngettext("%" G_GINT64_FORMAT " sector",
                                                             "%" G_GINT64_FORMAT " sectors", attrib->interpreted),
                                                    tmp, attrib->interpreted);
+                            break;
+                        case UDSK_INTPVAL_TB:
+                            tmp = h_strdup_cprintf("%" G_GINT64_FORMAT " TB", tmp, attrib->interpreted);
+			    break;
+                        case UDSK_INTPVAL_PROCENT:
+                            tmp = h_strdup_cprintf("%" G_GINT64_FORMAT " %%", tmp, attrib->interpreted);
                             break;
                         case UDSK_INTPVAL_DIMENSIONLESS:
                         default:
@@ -392,21 +473,22 @@ gboolean __scan_udisks2_devices(void) {
                     j = g_utf8_strlen(tmp, -1);
                     if (j < 13) tmp = h_strdup_cprintf("%*c", tmp, 13 - j, ' ');
 
-                    if (attrib->value != -1)
-                        tmp = h_strdup_cprintf("%-13d", tmp, attrib->value);
-                    else
-                        tmp = h_strdup_cprintf("%-13s", tmp, "???");
+		    if(!ext->nvme_controller){
+		        if (attrib->value != -1)
+                            tmp = h_strdup_cprintf("%-13d", tmp, attrib->value);
+			else
+                            tmp = h_strdup_cprintf("%-13s", tmp, "???");
 
-                    if (attrib->worst != -1)
-                        tmp = h_strdup_cprintf("%-8d", tmp, attrib->worst);
-                    else
-                        tmp = h_strdup_cprintf("%-8s", tmp, "???");
+                        if (attrib->worst != -1)
+                            tmp = h_strdup_cprintf("%-8d", tmp, attrib->worst);
+                        else
+                            tmp = h_strdup_cprintf("%-8s", tmp, "???");
 
-                    if (attrib->threshold != -1)
-                        tmp = h_strdup_cprintf("%d", tmp, attrib->threshold);
-                    else
-                        tmp = h_strdup_cprintf("???", tmp);
-
+                        if (attrib->threshold != -1)
+                            tmp = h_strdup_cprintf("%d", tmp, attrib->threshold);
+                        else
+                            tmp = h_strdup_cprintf("???", tmp);
+		    }
 
                     alabel = attrib->identifier;
                     for (i = 0; smart_attrib_info[i].identifier != NULL; i++) {
@@ -416,9 +498,11 @@ gboolean __scan_udisks2_devices(void) {
                         }
                     }
 
-                    moreinfo = h_strdup_cprintf(_("(%d) %s=<tt>%s</tt>\n"),
-                                            moreinfo,
-                                            attrib->id, alabel, tmp);
+		    if(ext->nvme_controller)
+		        moreinfo = h_strdup_cprintf(_("%s=<tt>%s</tt>\n"), moreinfo, alabel, tmp);
+		    else
+		        moreinfo = h_strdup_cprintf(_("(%d) %s=<tt>%s</tt>\n"), moreinfo, attrib->id, alabel, tmp);
+
                     g_free(tmp);
                     attrib = attrib->next;
                 }
