@@ -23,8 +23,10 @@ dmidecode -t 17 >/run/hardinfo2/dmi_memory 2>/dev/null
 UID_MIN=1000
 if [ -e /etc/login.defs ] ; then
     U=$(awk 'match($1,"^UID_MIN") {print $2}' /etc/login.defs)
-    if [ $U -gt 1 ] ; then
-	 UDI_MIN=$U
+    if [ -n "$U" ] ; then
+	if [ $U -gt 1 ] ; then
+	    UID_MIN=$U
+	fi
     fi
 fi
 #SYSTYPE 0:Root, 1:SingleUser 2:MultiUser
@@ -43,6 +45,7 @@ else
 	echo "Root Only System" >/run/hardinfo2/systype
     else
 	echo "Multi User System" >/run/hardinfo2/systype
+	SYSTYPE="2"
     fi
     #set owner to hardinfo2 (multiuser)
     chown -R root:hardinfo2 /run/hardinfo2
@@ -56,3 +59,14 @@ chmod 644 /run/hardinfo2/systype
 modprobe -q spd5118
 modprobe -q ee1004
 modprobe -q at24 || true
+
+#ipmi sensors
+while [ -f /sbin/ipmi-sensors ]; do
+    /sbin/ipmi-sensors |grep -v N/A|grep -v Presence >/run/hardinfo2/ipmi_sensors 2>/dev/null;
+    if [ $SYSTYPE = "1" ]; then
+       chown root:$GIDNAME /run/hardinfo2/ipmi_sensors
+    else
+       chown root:hardinfo2 /run/hardinfo2/ipmi_sensors
+    fi
+    sleep 60;
+done
